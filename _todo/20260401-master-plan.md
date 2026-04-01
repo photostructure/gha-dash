@@ -3,9 +3,8 @@
 ## Summary
 
 Design and build a GitHub Actions dashboard that shows workflow status across
-multiple orgs/accounts with trivial onboarding. The only prerequisite is an
-authenticated `gh` CLI. Supports viewing status for default branches and
-triggering manual workflow dispatches with input forms.
+multiple orgs/accounts with trivial onboarding. Supports viewing status for
+default branches and triggering manual workflow dispatches with input forms.
 
 ## Current Phase
 
@@ -20,7 +19,9 @@ triggering manual workflow dispatches with input forms.
 
 ## Required Reading
 
-- `_todo/20260401-phase1-core-server.md` — Phase 1: server + dashboard
+- `docs/DESIGN-PRINCIPLES.md` — Simple Design & Tidy First
+- `_todo/20260401-phase1a-scaffolding.md` — Phase 1a: project setup + API
+- `_todo/20260401-phase1b-dashboard.md` — Phase 1b: dashboard rendering
 - `_todo/20260401-phase2-settings-ui.md` — Phase 2: org/repo picker
 - `_todo/20260401-phase3-workflow-dispatch.md` — Phase 3: dispatch forms
 
@@ -33,17 +34,18 @@ triggering manual workflow dispatches with input forms.
 │  - Forms for workflow dispatch            │
 │  - Org/repo selector for configuration   │
 └──────────────┬───────────────────────────┘
-               │ HTTP (HTMX partials)
+               │ HTTP (HTML partials)
 ┌──────────────▼───────────────────────────┐
 │  Express Server (TypeScript)             │
-│  - EJS templates for HTML + partials     │
+│  - Tagged template literals (no EJS)     │
 │  - In-memory cache with TTL              │
 │  - Background polling for fresh data     │
+│  - Binds to 127.0.0.1 ONLY              │
 └──────────────┬───────────────────────────┘
                │ REST API (via Octokit)
 ┌──────────────▼───────────────────────────┐
 │  GitHub API                              │
-│  - Auth via `gh auth token`              │
+│  - Auth: gh auth token OR GITHUB_TOKEN   │
 │  - Workflows, runs, dispatch             │
 └──────────────────────────────────────────┘
 ```
@@ -55,47 +57,47 @@ triggering manual workflow dispatches with input forms.
 | Runtime | Node.js 20+ | Ubiquitous, LTS |
 | Language | TypeScript (strict) | Type safety, DX |
 | Server | Express 4 | Mature, well-known |
-| Templates | EJS | Simple, JS-native, good for partials |
+| Templates | Tagged template literals | Type-safe, zero deps, no build step |
 | Interactivity | HTMX 2.x | Polling, partials, forms — no build step |
 | Styling | Custom CSS | Hand-written, no framework |
 | GitHub API | @octokit/rest | Official SDK, pagination, rate limits |
-| YAML parsing | yaml | For workflow_dispatch inputs |
-| Config | env-paths + fs | Cross-platform ~/.config/gha-dash/ |
+| YAML parsing | yaml | For workflow_dispatch inputs (Phase 3) |
+| Config | XDG_CONFIG_HOME / ~/.config | Mac + Linux, no extra deps |
 | Dev | tsx | Fast TS execution, no build step |
 | Build | tsup | Simple bundling for npm publish |
 
 ## Key Design Decisions
 
-### Auth: `gh auth token`
-- Extract OAuth token at startup via `child_process.execSync`
-- Pass to Octokit constructor
+### Auth: `gh auth token` with env var fallback
+- Try `gh auth token` first (zero-config for gh users)
+- Fall back to `GITHUB_TOKEN` env var (works in containers, CI)
+- Pass token to Octokit constructor
 - Re-extract periodically (token refresh)
-- Fail fast with helpful error if `gh` not found or not authenticated
+- Fail fast with helpful error if neither source available
+
+### Security: Local-only by default
+- Express binds to `127.0.0.1`, NOT `0.0.0.0`
+- The extracted token gives full API access — exposing it to the network
+  would be a security hole
+- README must document this clearly
+- No OAuth dance needed for local use
 
 ### Multi-org support
-- The `gh` token has access to all orgs the user belongs to
+- The token has access to all orgs the user belongs to
 - Query `/user/orgs` to list available organizations
-- Query `/users/{username}/repos` and `/orgs/{org}/repos` for repo lists
 - Config stores flat list of `owner/repo` strings
 
 ### Config: `~/.config/gha-dash/config.json`
-- Cross-platform via `env-paths` (handles Linux, macOS, Windows)
+- Use `XDG_CONFIG_HOME` if set, else `~/.config` (Linux/Mac)
 - Stores: selected repos, refresh interval, port
 - Editable via settings UI or by hand
+- If config is corrupt, fail with a clear error — don't silently fix it
 
 ### Data refresh
 - Background poll every 60s (configurable) for all selected repos
-- For each repo: `GET /repos/{owner}/{repo}/actions/runs?branch={default}&per_page=100`
 - One API call per repo returns runs for all workflows — efficient
 - In-memory cache, no persistence needed
-- HTMX polls `/partials/workflows` every 30s for fresh HTML
-
-### Workflow dispatch inputs
-- GitHub API doesn't expose parsed inputs — must fetch workflow YAML
-- Use Contents API: `GET /repos/{owner}/{repo}/contents/{workflow_path}`
-- Parse YAML, extract `on.workflow_dispatch.inputs`
-- Render form with appropriate input types
-- Cache parsed inputs (workflow files change rarely)
+- HTMX polls for fresh HTML every 30s
 
 ### Rate limiting
 - Octokit handles 429 retries automatically
@@ -107,9 +109,9 @@ triggering manual workflow dispatches with input forms.
 
 ```
 $ npx gha-dash
-→ Checks for `gh` CLI (helpful error if missing)
-→ Extracts token via `gh auth token`
-→ Starts Express server on port 3131
+→ Checks for gh CLI or GITHUB_TOKEN
+→ Extracts token
+→ Starts Express on 127.0.0.1:3131
 → Opens browser to http://localhost:3131
 → No config yet? Redirects to /settings
 → User picks orgs → repos → saves
@@ -123,24 +125,29 @@ $ npx gha-dash
 | `/` | GET | Dashboard (full page) |
 | `/partials/workflows` | GET | HTMX partial: all workflow cards |
 | `/settings` | GET | Repo/org selector page |
-| `/partials/orgs` | GET | HTMX partial: available orgs |
 | `/partials/repos/:owner` | GET | HTMX partial: repos for an owner |
 | `/settings/repos` | POST | Save selected repos |
-| `/dispatch/:owner/:repo/:id` | GET | Dispatch form partial |
-| `/dispatch/:owner/:repo/:id` | POST | Trigger workflow dispatch |
+| `/dispatch/:owner/:repo/:id` | GET | Dispatch form partial (Phase 3) |
+| `/dispatch/:owner/:repo/:id` | POST | Trigger workflow dispatch (Phase 3) |
 
 ## Phasing
 
-**Phase 1 — Core Server & Dashboard (read-only)**
-Project scaffolding, Express server, GitHub API integration, dashboard
-rendering with workflow status cards, auto-refresh via HTMX polling.
+**Phase 1a — Scaffolding & API Client**
+Project setup, Express server, GitHub auth (gh + env var fallback),
+Octokit wrapper, config read/write, basic route structure.
+
+**Phase 1b — Dashboard Rendering**
+Workflow status cards, HTMX polling, CSS, tagged template functions.
 
 **Phase 2 — Settings UI**
-Org/repo picker, config persistence, first-run redirect, settings page.
+Org/repo picker, first-run redirect, settings page.
 
 **Phase 3 — Workflow Dispatch**
-Dispatch button, YAML parsing for inputs, dynamic form rendering,
-POST to GitHub API, success/error feedback.
+Dispatch button, lazy YAML fetch for inputs, dynamic form rendering.
+
+## Open Tasks
+
+- [ ] Write README with setup instructions and local-only security note
 
 ## Lore
 
@@ -152,12 +159,14 @@ POST to GitHub API, success/error feedback.
   varies (main, master, develop) — fetch repo metadata to get it
 - Workflow YAML `on.workflow_dispatch.inputs` supports types: string, choice,
   boolean, environment — each needs different form rendering
-- Express 5 is released but Express 4 is safer for stability
 - HTMX `hx-trigger="every 30s"` handles polling automatically
+- All user-based tokens (PAT, OAuth, gh) share the same 5,000/hr rate limit
 
 ## Session Log
 
 - **2026-04-01**: Initial planning session. Researched gh CLI capabilities,
   GitHub Actions API endpoints, reference project (chriskinsman/github-action-dashboard).
-  Iterated through 4 architecture options. Settled on Express + EJS + HTMX
-  with custom CSS. Created master plan and 3 phase TPPs.
+  Settled on Express + HTMX with custom CSS.
+- **2026-04-01**: Review session. Switched from EJS to tagged template
+  literals. Added GITHUB_TOKEN fallback. Dropped env-paths dependency.
+  Added 127.0.0.1 security requirement. Split Phase 1 into 1a/1b.
