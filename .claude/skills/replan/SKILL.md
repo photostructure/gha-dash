@@ -85,15 +85,24 @@ For each iteration, present options with pros/cons:
 
 [Which option and why]
 
-## Design Principles
+## Design Principles (TL;DR of `docs/DESIGN-PRINCIPLES.md`)
 
-Follow `docs/DESIGN-PRINCIPLES.md` — Simple Design & Tidy First. Key points:
+**Four Rules of Simple Design** (in priority order):
+1. **Passes the tests** — working code beats everything
+2. **Reveals intention** — clear names, structure matches the problem domain
+3. **No duplication** — eliminate repeated logic and knowledge
+4. **Fewest elements** — remove anything that doesn't serve rules 1-3
+5. **No bogus guardrails** — fail early and visibly; never silently swallow errors or invent defaults
 
-- Four Rules: passes tests, reveals intention, no duplication, fewest elements
-- Fail early and visibly — no bogus guardrails or silent defaults
-- Keep tidyings in separate commits from behavior changes
+**Tidy First methodology:**
+- Small structural changes (guard clauses, explaining variables, extract helper, etc.) that don't alter behavior
+- Keep tidyings in **separate commits** from behavior changes
+- Tidy only enough to make the next behavior change easier — not a refactoring sprint
 - Reduce coupling; prefer explicit dependencies over hidden ones
-- Be honest about tradeoffs
-- Ask questions — don't guess
-- Prefer well-established libraries and patterns over custom solutions
-- Optimize for developer experience — this is a tool for developers
+
+**When evaluating plans, watch for:**
+- Over-engineering and speculative abstractions (Rule 4)
+- Missing error handling strategy — should errors propagate or be caught? (Rule 5)
+- Hidden coupling between components
+- Premature optimization vs. premature abstraction
+- Be honest about tradeoffs; ask questions — don't guess

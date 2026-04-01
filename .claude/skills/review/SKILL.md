@@ -13,8 +13,8 @@ Review the mentioned code for potential issues and improvements.
 Study these project resources before reviewing:
 
 - `CLAUDE.md` (project conventions and guidelines)
+- `docs/DESIGN-PRINCIPLES.md` (Simple Design & Tidy First)
 - `.claude/settings.json` (project tool and permission settings)
-- Any `*.md` files in the project root or `docs/` directory for design principles
 
 **Only report verified bugs, things that are actually wrong.** Do NOT report:
 
@@ -65,11 +65,13 @@ Do not pad the list.
 - Race conditions in concurrent workflow runs
 - Inefficient caching or unnecessary workflow triggers
 
-**Code quality**
+**Code quality (per `docs/DESIGN-PRINCIPLES.md`)**
 
-- Violations of project design principles or coding standards
-- Dead code (suggest deleting it)
-- Comments that merely restate the function name (suggest removing)
+- **Rule 2 — Reveals intention**: Unclear names, structure that obscures the problem domain
+- **Rule 3 — No duplication**: Repeated logic or knowledge across files
+- **Rule 4 — Fewest elements**: Speculative abstractions, unused code (suggest deleting)
+- **Rule 5 — No bogus guardrails**: Silent error swallowing, invented defaults on failure, unnecessary existence checks
+- **Tidyings**: Comments that restate code (delete), missing guard clauses, magic numbers without named constants
 
 **Security**
 

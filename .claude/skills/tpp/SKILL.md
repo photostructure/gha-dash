@@ -17,6 +17,13 @@ Before any work, you MUST read these files (in order):
 
 1. [CLAUDE.md](../../../CLAUDE.md) — project conventions and rules
 2. [TPP-GUIDE.md](../../../docs/TPP-GUIDE.md) — how TPPs work, format, and lifecycle
+3. [DESIGN-PRINCIPLES.md](../../../docs/DESIGN-PRINCIPLES.md) — Simple Design & Tidy First
+
+**Design Principles TL;DR:**
+- Four Rules (priority order): passes tests, reveals intention, no duplication, fewest elements
+- Fail early and visibly — no bogus guardrails or silent defaults
+- Keep tidyings in separate commits from behavior changes
+- Reduce coupling; prefer explicit dependencies over hidden ones
 
 ## Process
 
