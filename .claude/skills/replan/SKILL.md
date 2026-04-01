@@ -87,9 +87,13 @@ For each iteration, present options with pros/cons:
 
 ## Design Principles
 
-- Consider Kent Beck's Simple Design rules
-- Consider coupling, cohesion, testability
+Follow `docs/DESIGN-PRINCIPLES.md` — Simple Design & Tidy First. Key points:
+
+- Four Rules: passes tests, reveals intention, no duplication, fewest elements
+- Fail early and visibly — no bogus guardrails or silent defaults
+- Keep tidyings in separate commits from behavior changes
+- Reduce coupling; prefer explicit dependencies over hidden ones
 - Be honest about tradeoffs
-- Ask questions - don't guess
+- Ask questions — don't guess
 - Prefer well-established libraries and patterns over custom solutions
-- Optimize for developer experience - this is a tool for developers
+- Optimize for developer experience — this is a tool for developers
