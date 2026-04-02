@@ -1,14 +1,20 @@
 export interface AppConfig {
   repos: string[]; // "owner/repo" format; empty = show all
-  refreshInterval: number; // seconds, default 60
+  branches: Record<string, string>; // "owner/repo" → default branch name
+  refreshInterval: number; // seconds, default 300
   lookbackDays: number; // skip runs older than this, default 7
+  rateLimitFloor: number; // stop refreshing below this many remaining calls
+  rateBudgetPct: number; // use at most this % of remaining rate limit per cycle
   port: number; // default 3131
 }
 
 export const defaultConfig: AppConfig = {
   repos: [],
-  refreshInterval: 60,
+  branches: {},
+  refreshInterval: 300,
   lookbackDays: 7,
+  rateLimitFloor: 500,
+  rateBudgetPct: 50,
   port: 3131,
 };
 

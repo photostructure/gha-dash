@@ -5,6 +5,7 @@ import {
   createOctokit,
   extractToken,
   fetchAllRuns,
+  fetchRateLimit,
   fetchUserRepos,
 } from "./services/github.js";
 import { readConfig, writeConfig } from "./services/config.js";
@@ -35,7 +36,6 @@ export async function initAppState(): Promise<AppState> {
 
   const cache = new Cache<WorkflowRun[]>(config.refreshInterval);
 
-  // Restore cached data from disk so restarts don't burn API credits
   const loaded = await cache.loadFromDisk();
   if (loaded) {
     console.log(`Restored ${cache.size()} repos from disk cache`);
@@ -57,21 +57,44 @@ export async function refreshRuns(): Promise<void> {
   refreshing = true;
 
   try {
+    // Check rate limit before doing anything
+    try {
+      state.rateLimit = await fetchRateLimit(state.octokit);
+    } catch {
+      // Can't check rate limit — proceed cautiously
+    }
+
+    if (state.rateLimit) {
+      const { remaining, limit } = state.rateLimit;
+      const floor = state.config.rateLimitFloor;
+
+      if (remaining <= floor) {
+        console.log(
+          `Rate limit: ${remaining}/${limit} remaining (floor: ${floor}). Skipping refresh.`,
+        );
+        return;
+      }
+    }
+
     let repos = state.config.repos;
 
     // First-run: no repos configured — discover all user repos
     if (repos.length === 0) {
       repos = await fetchUserRepos(state.octokit);
-      // Persist discovered repos so we don't re-discover on restart
       state.config.repos = repos;
       await writeConfig(state.config);
       console.log(`Discovered ${repos.length} repos, saved to config`);
     }
 
-    const { runs, errors } = await fetchAllRuns(
+    // Calculate how many repos we can afford to refresh this cycle
+    const maxRepos = computeBudget(state, repos.length);
+
+    const { runs, errors, discoveredBranches } = await fetchAllRuns(
       state.octokit,
       repos,
       state.config.lookbackDays,
+      state.config.branches,
+      maxRepos,
     );
 
     for (const [repo, repoRuns] of runs) {
@@ -84,23 +107,29 @@ export async function refreshRuns(): Promise<void> {
       state.cache.setError(repo, message);
     }
 
-    // Persist cache to disk
+    // Persist newly discovered branches to config
+    if (Object.keys(discoveredBranches).length > 0) {
+      state.config.branches = {
+        ...state.config.branches,
+        ...discoveredBranches,
+      };
+      await writeConfig(state.config);
+    }
+
     await state.cache.saveToDisk();
 
-    // Update rate limit info
+    // Update rate limit after the fetch
     try {
-      const { data } = await state.octokit.rateLimit.get();
-      state.rateLimit = {
-        remaining: data.rate.remaining,
-        limit: data.rate.limit,
-      };
+      state.rateLimit = await fetchRateLimit(state.octokit);
+      console.log(
+        `Refreshed ${runs.size} repos. API: ${state.rateLimit.remaining}/${state.rateLimit.limit} remaining`,
+      );
     } catch {
       // Non-critical
     }
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status === 401) {
-      // Token expired — try re-extracting
       try {
         const newToken = extractToken();
         state.octokit = createOctokit(newToken);
@@ -116,13 +145,54 @@ export async function refreshRuns(): Promise<void> {
   }
 }
 
-export function startBackgroundRefresh(): void {
-  refreshRuns();
+/**
+ * Compute how many repos we can refresh this cycle based on rate limit budget.
+ * Each repo costs 1 API call (runs) + possibly 1 (branch, if not cached).
+ * Returns undefined if no budget constraint applies (fetch all).
+ */
+function computeBudget(state: AppState, totalRepos: number): number | undefined {
+  if (!state.rateLimit) return undefined;
 
-  refreshInterval = setInterval(
-    () => refreshRuns(),
-    (state?.config.refreshInterval ?? 60) * 1000,
-  );
+  const { remaining, limit } = state.rateLimit;
+  const floor = state.config.rateLimitFloor;
+  const pct = state.config.rateBudgetPct / 100;
+
+  // Available = what we're willing to spend this cycle
+  const budgetFromPct = Math.floor(limit * pct);
+  const available = Math.min(remaining - floor, budgetFromPct);
+
+  if (available >= totalRepos) return undefined; // Can afford all repos
+  if (available <= 0) return 0;
+
+  return available;
+}
+
+export function startBackgroundRefresh(): void {
+  if (!state) return;
+
+  // Skip immediate refresh if disk cache is fresh
+  const newestEntry = getNewestCacheEntry(state);
+  const cacheAgeMs = newestEntry ? Date.now() - newestEntry : Infinity;
+  const intervalMs = state.config.refreshInterval * 1000;
+
+  if (cacheAgeMs < intervalMs) {
+    const ageMin = Math.round(cacheAgeMs / 60_000);
+    console.log(`Cache is fresh (${ageMin}m old), skipping initial refresh`);
+  } else {
+    refreshRuns();
+  }
+
+  refreshInterval = setInterval(() => refreshRuns(), intervalMs);
+}
+
+function getNewestCacheEntry(state: AppState): number | null {
+  let newest: number | null = null;
+  for (const [, entry] of state.cache.entries()) {
+    if (newest === null || entry.fetchedAt > newest) {
+      newest = entry.fetchedAt;
+    }
+  }
+  return newest;
 }
 
 export function stopBackgroundRefresh(): void {

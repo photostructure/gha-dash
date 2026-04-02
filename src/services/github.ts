@@ -133,24 +133,50 @@ export async function fetchWorkflowRuns(
 export interface FetchResult {
   runs: Map<string, WorkflowRun[]>;
   errors: Map<string, string>;
+  /** Branches discovered during this fetch (to persist to config) */
+  discoveredBranches: Record<string, string>;
 }
 
-/** Fetch runs for many repos in parallel, capped at API_CONCURRENCY */
+/**
+ * Fetch runs for repos in parallel, capped at API_CONCURRENCY.
+ * Uses cached branches to avoid per-repo GET /repos/{o}/{r} calls.
+ * If maxRepos is set, only fetches that many repos (for budget throttling).
+ */
 export async function fetchAllRuns(
   octokit: Octokit,
   repos: string[],
   lookbackDays: number,
+  cachedBranches: Record<string, string>,
+  maxRepos?: number,
 ): Promise<FetchResult> {
   const limit = pLimit(API_CONCURRENCY);
   const runs = new Map<string, WorkflowRun[]>();
   const errors = new Map<string, string>();
+  const discoveredBranches: Record<string, string> = {};
+
+  // If budget-limited, take a subset. Rotate by using a time-based offset
+  // so different repos get refreshed each cycle.
+  let reposToFetch = repos;
+  if (maxRepos !== undefined && maxRepos < repos.length) {
+    const offset = Math.floor(Date.now() / 1000) % repos.length;
+    reposToFetch = [];
+    for (let i = 0; i < maxRepos; i++) {
+      reposToFetch.push(repos[(offset + i) % repos.length]);
+    }
+  }
 
   await Promise.all(
-    repos.map((fullName) =>
+    reposToFetch.map((fullName) =>
       limit(async () => {
         const [owner, repo] = fullName.split("/");
         try {
-          const branch = await fetchDefaultBranch(octokit, owner, repo);
+          // Use cached branch if available, otherwise fetch (1 API call)
+          let branch = cachedBranches[fullName];
+          if (!branch) {
+            branch = await fetchDefaultBranch(octokit, owner, repo);
+            discoveredBranches[fullName] = branch;
+          }
+
           const result = await fetchWorkflowRuns(
             octokit,
             owner,
@@ -166,5 +192,12 @@ export async function fetchAllRuns(
     ),
   );
 
-  return { runs, errors };
+  return { runs, errors, discoveredBranches };
+}
+
+export async function fetchRateLimit(
+  octokit: Octokit,
+): Promise<{ remaining: number; limit: number }> {
+  const { data } = await octokit.rateLimit.get();
+  return { remaining: data.rate.remaining, limit: data.rate.limit };
 }
