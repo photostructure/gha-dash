@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAppState } from "../state.js";
+import { getAppState, refreshRepo, refreshRuns } from "../state.js";
 import { displayStatus, formatDuration, relativeTime } from "../types.js";
 
 export function dashboardRoutes(): Router {
@@ -31,6 +31,37 @@ export function dashboardRoutes(): Router {
       formatDuration,
       relativeTime,
     });
+  });
+
+  // POST /refresh — refresh all repos
+  router.post("/refresh", async (_req, res) => {
+    await refreshRuns();
+    const state = getAppState();
+    const grouped = groupRunsByRepo(state);
+    res.render("partials/workflow-table", {
+      grouped,
+      displayStatus,
+      formatDuration,
+      relativeTime,
+    });
+  });
+
+  // POST /refresh/:owner/:repo — refresh a single repo
+  router.post("/refresh/:owner/:repo", async (req, res, next) => {
+    try {
+      const fullName = `${req.params.owner}/${req.params.repo}`;
+      await refreshRepo(fullName);
+      const state = getAppState();
+      const grouped = groupRunsByRepo(state);
+      res.render("partials/workflow-table", {
+        grouped,
+        displayStatus,
+        formatDuration,
+        relativeTime,
+      });
+    } catch (err) {
+      next(err);
+    }
   });
 
   return router;

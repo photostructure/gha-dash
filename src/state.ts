@@ -5,8 +5,10 @@ import {
   createOctokit,
   extractToken,
   fetchAllRuns,
+  fetchDefaultBranch,
   fetchRateLimit,
   fetchUserRepos,
+  fetchWorkflowRuns,
 } from "./services/github.js";
 import { readConfig, writeConfig } from "./services/config.js";
 
@@ -200,6 +202,37 @@ function getNewestCacheEntry(state: AppState): number | null {
     }
   }
   return newest;
+}
+
+/** Refresh a single repo on demand (e.g. from the refresh button) */
+export async function refreshRepo(fullName: string): Promise<void> {
+  if (!state) return;
+
+  const [owner, repo] = fullName.split("/");
+  let branch = state.config.branches[fullName];
+  if (!branch) {
+    branch = await fetchDefaultBranch(state.octokit, owner, repo);
+    state.config.branches[fullName] = branch;
+    await writeConfig(state.config);
+  }
+
+  try {
+    const runs = await fetchWorkflowRuns(
+      state.octokit,
+      owner,
+      repo,
+      branch,
+      state.config.lookbackDays,
+    );
+
+    if (runs.length > 0) {
+      state.cache.set(fullName, runs);
+      await state.cache.saveToDisk();
+    }
+    // If runs is empty, keep existing cache — don't delete what we had
+  } catch (err) {
+    state.cache.setError(fullName, (err as Error).message);
+  }
 }
 
 export function stopBackgroundRefresh(): void {

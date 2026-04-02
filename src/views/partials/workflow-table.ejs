@@ -17,11 +17,21 @@
         <% if (group.error) { %>
           <span class="error-badge" title="<%= group.error %>">&#x26A0; error</span>
         <% } %>
+        <button
+          type="button"
+          class="btn-refresh"
+          hx-post="/refresh/<%= group.repo %>"
+          hx-target="#workflow-rows"
+          hx-swap="innerHTML"
+          onclick="event.stopPropagation()"
+          title="Refresh <%= group.repo %>"
+          aria-label="Refresh <%= group.repo %>"
+        >&#x21BB;</button>
       </td>
     </tr>
     <% for (const run of group.runs) { %>
       <tr data-repo="<%= group.repo %>">
-        <td><a href="<%= run.htmlUrl %>" target="_blank" rel="noopener"><%= run.workflowName %></a></td>
+        <td><a href="<%= run.htmlUrl %>" target="_blank" rel="noopener" title="<%= run.commitMessage %>"><%= run.workflowName %></a></td>
         <td><code><%= run.branch %></code></td>
         <td>
           <% const status = displayStatus(run); %>

@@ -111,9 +111,14 @@ export async function fetchWorkflowRuns(
         : Date.now() -
           new Date(run.run_started_at ?? run.created_at).getTime();
 
+    // Derive workflow name from path: .github/workflows/build.yml → "build"
+    const path = run.path ?? "";
+    const fileName = path.split("/").pop()?.replace(/\.(yml|yaml)$/, "") ?? "";
+    const workflowName = fileName || (run.name ?? `Workflow ${run.workflow_id}`);
+
     seen.set(key, {
       workflowId: run.workflow_id,
-      workflowName: run.name ?? `Workflow ${run.workflow_id}`,
+      workflowName,
       repo: `${owner}/${repo}`,
       status: run.status as WorkflowRun["status"],
       conclusion: (run.conclusion as WorkflowRun["conclusion"]) ?? null,
@@ -123,7 +128,7 @@ export async function fetchWorkflowRuns(
       duration,
       createdAt: run.created_at,
       htmlUrl: run.html_url,
-      workflowPath: run.path ?? "",
+      workflowPath: path,
     });
   }
 
