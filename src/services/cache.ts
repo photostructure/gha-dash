@@ -48,6 +48,10 @@ export class Cache<T> {
     return this.store.size;
   }
 
+  delete(key: string): void {
+    this.store.delete(key);
+  }
+
   clear(): void {
     this.store.clear();
   }

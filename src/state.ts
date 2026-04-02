@@ -38,6 +38,13 @@ export async function initAppState(): Promise<AppState> {
 
   const loaded = await cache.loadFromDisk();
   if (loaded) {
+    // Prune cache to only repos in config (if configured)
+    if (config.repos.length > 0) {
+      const keep = new Set(config.repos);
+      for (const [repo] of cache.entries()) {
+        if (!keep.has(repo)) cache.delete(repo);
+      }
+    }
     console.log(`Restored ${cache.size()} repos from disk cache`);
   }
 
@@ -206,6 +213,18 @@ export async function updateConfig(
   updates: Partial<AppConfig>,
 ): Promise<void> {
   if (!state) return;
+
+  // If repos changed, prune cache to only keep selected repos
+  if (updates.repos) {
+    const keep = new Set(updates.repos);
+    for (const [repo] of state.cache.entries()) {
+      if (!keep.has(repo)) {
+        state.cache.delete(repo);
+      }
+    }
+    await state.cache.saveToDisk();
+  }
+
   state.config = { ...state.config, ...updates };
   await writeConfig(state.config);
 }
