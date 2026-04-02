@@ -14,6 +14,10 @@
       <input type="checkbox" id="failures-only" onchange="applyFilters()">
       Failures only
     </label>
+    <div class="checkbox-helpers">
+      <button type="button" onclick="expandAll()">Expand</button>
+      <button type="button" onclick="collapseAll()">Collapse</button>
+    </div>
   </div>
 
   <table class="workflow-table">
@@ -224,6 +228,26 @@ function restoreCollapseState() {
   Object.keys(state).forEach(function(repo) {
     if (state[repo]) applyCollapse(repo, true);
   });
+}
+
+function expandAll() {
+  var state = {};
+  document.querySelectorAll('.repo-header').forEach(function(h) {
+    var repo = h.getAttribute('data-repo-header');
+    state[repo] = false;
+    applyCollapse(repo, false);
+  });
+  localStorage.setItem('gha-dash-collapsed', JSON.stringify(state));
+}
+
+function collapseAll() {
+  var state = {};
+  document.querySelectorAll('.repo-header').forEach(function(h) {
+    var repo = h.getAttribute('data-repo-header');
+    state[repo] = true;
+    applyCollapse(repo, true);
+  });
+  localStorage.setItem('gha-dash-collapsed', JSON.stringify(state));
 }
 
 restoreCollapseState();
