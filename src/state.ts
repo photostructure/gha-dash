@@ -85,15 +85,19 @@ export async function refreshRuns(): Promise<void> {
       }
     }
 
-    let repos = state.config.repos;
-
-    // First-run: no repos configured — discover all user repos
-    if (repos.length === 0) {
-      repos = await fetchUserRepos(state.octokit);
-      state.config.repos = repos;
+    // Discover available repos if we haven't yet
+    if (state.config.availableRepos.length === 0) {
+      const discovered = await fetchUserRepos(state.octokit);
+      state.config.availableRepos = discovered;
+      // First-run: also select all discovered repos
+      if (state.config.repos.length === 0) {
+        state.config.repos = discovered;
+      }
       await writeConfig(state.config);
-      console.log(`Discovered ${repos.length} repos, saved to config`);
+      console.log(`Discovered ${discovered.length} repos, saved to config`);
     }
+
+    const repos = state.config.repos;
 
     // Calculate how many repos we can afford to refresh this cycle
     const maxRepos = computeBudget(state, repos.length);

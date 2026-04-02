@@ -1,5 +1,6 @@
 export interface AppConfig {
   repos: string[]; // "owner/repo" format; empty = show all
+  availableRepos: string[]; // full set discovered from GitHub
   branches: Record<string, string>; // "owner/repo" → default branch name
   refreshInterval: number; // seconds, default 300
   lookbackDays: number; // skip runs older than this, default 7
@@ -10,9 +11,10 @@ export interface AppConfig {
 
 export const defaultConfig: AppConfig = {
   repos: [],
+  availableRepos: [],
   branches: {},
-  refreshInterval: 300,
-  lookbackDays: 7,
+  refreshInterval: 3600,
+  lookbackDays: 30,
   rateLimitFloor: 500,
   rateBudgetPct: 50,
   port: 3131,

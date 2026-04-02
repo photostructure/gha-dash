@@ -257,55 +257,13 @@ th.sort-desc::after { content: ' \25BC'; }
 }
 
 /* Settings page */
-.settings { padding: 16px 24px; max-width: 800px; }
+.settings { padding: 16px 24px; max-width: 700px; }
 .settings h2 { margin-bottom: 8px; }
-.settings h3 { margin-top: 24px; margin-bottom: 12px; }
-.settings h4 { margin-bottom: 8px; }
 .settings p { color: var(--text-muted); margin-bottom: 16px; }
-
-.current-repos {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 16px;
-}
-
-.current-repos summary {
-  cursor: pointer;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-
-.settings-layout {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 24px;
-}
-
-.org-buttons {
-  list-style: none;
-}
-
-.org-buttons button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  margin-bottom: 4px;
-  font-size: 14px;
-}
-
-.org-buttons button:hover { background: var(--bg-alt); }
 
 .checkbox-helpers {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
 }
 
 .checkbox-helpers button {
@@ -320,18 +278,31 @@ th.sort-desc::after { content: ' \25BC'; }
 
 .checkbox-helpers button:hover { color: var(--text); border-color: var(--text-muted); }
 
-.repo-checkboxes { max-height: 500px; overflow-y: auto; }
-
-.repo-item {
-  display: block;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
 }
 
-.repo-item:hover { background: var(--bg-alt); }
-.repo-name { font-weight: 500; }
-.repo-desc { display: block; font-size: 12px; color: var(--text-muted); }
+.settings-table th {
+  text-align: left;
+  padding: 6px 12px;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg-alt);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.settings-table td {
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-table tr:hover td { background: var(--bg-alt); }
+.settings-table .check-col { width: 32px; text-align: center; }
 
 .hint { color: var(--text-muted); font-style: italic; }
 
