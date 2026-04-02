@@ -2,30 +2,19 @@
 
 <div class="settings">
   <h2>Settings</h2>
-  <p>
-    Monitoring <%= selectedRepos.length %> of <%= availableRepos.length %> repos.
-    <% if (availableRepos.length === 0) { %>
-      <em>No repos discovered yet — refresh the dashboard first.</em>
-    <% } %>
-  </p>
 
   <% if (availableRepos.length > 0) { %>
+  <details open>
+    <summary><strong>Repos</strong> &mdash; <%= selectedRepos.length %> of <%= availableRepos.length %> selected</summary>
     <form method="POST" action="/settings/repos" id="repo-form">
       <div class="toolbar">
-        <input
-          type="text"
-          id="repo-search"
-          placeholder="Filter repos..."
-          aria-label="Filter repos"
-          oninput="filterRepos(this.value)"
-        >
+        <input type="text" id="repo-search" placeholder="Filter repos..." aria-label="Filter repos" oninput="filterRepos(this.value)">
         <div class="checkbox-helpers">
           <button type="button" onclick="checkAll()">All</button>
           <button type="button" onclick="checkNone()">None</button>
           <button type="button" onclick="checkInverse()">Invert</button>
         </div>
       </div>
-
       <table class="settings-table" id="settings-table">
         <thead>
           <tr>
@@ -36,26 +25,52 @@
         </thead>
         <tbody>
           <% for (const repo of availableRepos) { %>
-            <%
-              const parts = repo.split('/');
-              const owner = parts[0];
-              const name = parts[1];
-              const checked = selectedRepos.includes(repo);
-            %>
+            <% const [owner, name] = repo.split('/'); %>
             <tr data-owner="<%= owner %>" data-repo="<%= name %>">
-              <td class="check-col">
-                <input type="checkbox" name="repos" value="<%= repo %>" <%= checked ? 'checked' : '' %>>
-              </td>
+              <td class="check-col"><input type="checkbox" name="repos" value="<%= repo %>" <%= selectedRepos.includes(repo) ? 'checked' : '' %>></td>
               <td><%= owner %></td>
               <td><%= name %></td>
             </tr>
           <% } %>
         </tbody>
       </table>
+      <button type="submit" class="btn btn-primary">Save repos</button>
+    </form>
+  </details>
+  <% } else { %>
+    <p class="hint">No repos discovered yet — refresh the dashboard first.</p>
+  <% } %>
 
+  <details open>
+    <summary><strong>General</strong></summary>
+    <form method="POST" action="/settings/config" class="config-form">
+      <div class="form-field">
+        <label for="refreshInterval">Refresh interval (seconds)</label>
+        <input type="number" id="refreshInterval" name="refreshInterval" value="<%= config.refreshInterval %>" min="60">
+      </div>
+      <div class="form-field">
+        <label for="rateLimitFloor">Rate limit floor</label>
+        <input type="number" id="rateLimitFloor" name="rateLimitFloor" value="<%= config.rateLimitFloor %>" min="0">
+        <small class="field-help">Stop refreshing when remaining API calls drop below this number.</small>
+      </div>
+      <div class="form-field">
+        <label for="rateBudgetPct">Rate budget per cycle (%)</label>
+        <input type="number" id="rateBudgetPct" name="rateBudgetPct" value="<%= config.rateBudgetPct %>" min="1" max="100">
+        <small class="field-help">Max percentage of rate limit to use per refresh cycle.</small>
+      </div>
+      <div class="form-field">
+        <label for="port">Port</label>
+        <input type="number" id="port" name="port" value="<%= config.port %>" min="1" max="65535">
+        <small class="field-help">Takes effect on next restart.</small>
+      </div>
+      <div class="form-field">
+        <label for="hiddenWorkflows">Hidden workflows</label>
+        <input type="text" id="hiddenWorkflows" name="hiddenWorkflows" value="<%= config.hiddenWorkflows.join(', ') %>">
+        <small class="field-help">Comma-separated. Hides workflows whose name contains any of these (case-insensitive).</small>
+      </div>
       <button type="submit" class="btn btn-primary">Save</button>
     </form>
-  <% } %>
+  </details>
 </div>
 
 <script>
@@ -74,7 +89,6 @@ function getVisibleCheckboxes() {
     .map(function(tr) { return tr.querySelector('input[type="checkbox"]'); })
     .filter(Boolean);
 }
-
 function filterRepos(query) {
   var q = query.toLowerCase();
   document.querySelectorAll('#settings-table tbody tr').forEach(function(row) {
@@ -83,7 +97,6 @@ function filterRepos(query) {
 }
 
 var settingsSort = { col: 'repo', desc: false };
-
 function sortSettings(col) {
   if (settingsSort.col === col) {
     settingsSort.desc = !settingsSort.desc;
@@ -91,10 +104,8 @@ function sortSettings(col) {
     settingsSort.col = col;
     settingsSort.desc = false;
   }
-
   var tbody = document.querySelector('#settings-table tbody');
   var rows = Array.from(tbody.querySelectorAll('tr'));
-
   rows.sort(function(a, b) {
     var va, vb;
     if (col === 'selected') {
@@ -110,10 +121,7 @@ function sortSettings(col) {
     var cmp = va < vb ? -1 : va > vb ? 1 : 0;
     return settingsSort.desc ? -cmp : cmp;
   });
-
   rows.forEach(function(row) { tbody.appendChild(row); });
-
-  // Update sort indicators
   document.querySelectorAll('#settings-table th.sortable').forEach(function(th) {
     th.classList.remove('sort-active', 'sort-asc', 'sort-desc');
     if (th.getAttribute('data-sort') === col) {

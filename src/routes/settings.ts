@@ -9,6 +9,7 @@ export function settingsRoutes(): Router {
       const state = getAppState();
       res.render("settings", {
         page: "settings",
+        config: state.config,
         availableRepos: state.config.availableRepos,
         selectedRepos: state.config.repos,
       });
@@ -24,7 +25,28 @@ export function settingsRoutes(): Router {
 
       await updateConfig({ repos: repoList });
       refreshRuns();
-      res.redirect("/");
+      res.redirect("/settings");
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post("/settings/config", async (req, res, next) => {
+    try {
+      const { refreshInterval, rateLimitFloor, rateBudgetPct, port, hiddenWorkflows } = req.body;
+
+      await updateConfig({
+        refreshInterval: parseInt(refreshInterval, 10),
+        rateLimitFloor: parseInt(rateLimitFloor, 10),
+        rateBudgetPct: parseInt(rateBudgetPct, 10),
+        port: parseInt(port, 10),
+        hiddenWorkflows: hiddenWorkflows
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean),
+      });
+
+      res.redirect("/settings");
     } catch (err) {
       next(err);
     }

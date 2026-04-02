@@ -292,8 +292,31 @@ th.sort-desc::after { content: ' \25BC'; }
 
 /* Settings page */
 .settings { padding: 16px 24px; max-width: 700px; }
-.settings h2 { margin-bottom: 8px; }
-.settings p { color: var(--text-muted); margin-bottom: 16px; }
+.settings h2 { margin-bottom: 16px; }
+
+.settings details {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.settings summary {
+  padding: 10px 14px;
+  cursor: pointer;
+  background: var(--bg-alt);
+  border-radius: 6px;
+  user-select: none;
+}
+
+.settings details[open] summary {
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+
+.settings details > form,
+.settings details > .hint {
+  padding: 14px;
+}
 
 .checkbox-helpers {
   display: flex;
@@ -315,7 +338,6 @@ th.sort-desc::after { content: ' \25BC'; }
 .settings-table {
   width: 100%;
   border-collapse: collapse;
-  border: 1px solid var(--border);
   margin-bottom: 12px;
 }
 
@@ -337,6 +359,30 @@ th.sort-desc::after { content: ' \25BC'; }
 
 .settings-table tr:hover td { background: var(--bg-alt); }
 .settings-table .check-col { width: 32px; text-align: center; }
+
+.config-form .form-field {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.config-form .form-field label { margin-bottom: 0; }
+
+.config-form .field-help {
+  grid-column: 2;
+}
+
+.config-form input[type="number"] {
+  max-width: 120px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+}
 
 .hint { color: var(--text-muted); font-style: italic; }
 
