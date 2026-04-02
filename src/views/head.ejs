@@ -11,7 +11,11 @@
   <header>
     <h1><a href="/">gha-dash</a></h1>
     <nav>
-      <a href="/settings">&#9881; Settings</a>
+      <% if (typeof page !== 'undefined' && page === 'settings') { %>
+        <a href="/">&larr; Dashboard</a>
+      <% } else { %>
+        <a href="/settings">&#9881; Settings</a>
+      <% } %>
     </nav>
   </header>
   <main>

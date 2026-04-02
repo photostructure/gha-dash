@@ -13,6 +13,7 @@ export function settingsRoutes(): Router {
     try {
       const state = getAppState();
       res.render("settings", {
+        page: "settings",
         selectedRepos: state.config.repos,
         username: state.username,
       });
