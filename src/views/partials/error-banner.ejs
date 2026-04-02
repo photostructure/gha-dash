@@ -1,7 +1,27 @@
 <% if (typeof errors !== 'undefined' && errors.length > 0) { %>
-  <div class="error-banner" role="alert">
-    <% for (const err of errors) { %>
-      <p><strong><%= err.repo %>:</strong> <%= err.message %></p>
+  <%
+    // Group errors by their core message, stripping request IDs and timestamps
+    const grouped = {};
+    for (const err of errors) {
+      // Extract just the error type, e.g. "API rate limit exceeded for user ID 216377"
+      const key = err.message
+        .replace(/,?\s*please include the request ID\b.*$/i, '')
+        .replace(/\s*-\s*https:\/\/.*$/, '')
+        .trim();
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(err.repo);
+    }
+  %>
+  <div class="error-banner" role="alert" id="error-banner">
+    <button type="button" class="error-dismiss" onclick="document.getElementById('error-banner').remove()" aria-label="Dismiss">&times;</button>
+    <% for (const [msg, repos] of Object.entries(grouped)) { %>
+      <p>
+        <% if (repos.length > 3) { %>
+          <strong><%= repos.length %> repos:</strong> <%= msg %>
+        <% } else { %>
+          <strong><%= repos.join(', ') %>:</strong> <%= msg %>
+        <% } %>
+      </p>
     <% } %>
   </div>
 <% } %>

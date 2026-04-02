@@ -188,13 +188,29 @@ th.sort-desc::after { content: ' \25BC'; }
 }
 
 .error-banner {
-  padding: 8px 16px;
+  position: relative;
+  padding: 8px 40px 8px 16px;
   margin-bottom: 12px;
   background: var(--failure-bg);
   color: var(--failure);
   border: 1px solid var(--failure);
   border-radius: 6px;
 }
+
+.error-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--failure);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.error-dismiss:hover { opacity: 0.7; }
 
 .loading, .no-runs {
   text-align: center;
