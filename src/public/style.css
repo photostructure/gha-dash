@@ -63,6 +63,14 @@ header h1 a { color: var(--text); }
 header nav { display: flex; align-items: center; gap: 12px; }
 header nav a { color: var(--text-muted); }
 
+.rate-limit-badge {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
 .btn-refresh-all {
   background: none;
   border: 1px solid var(--border);

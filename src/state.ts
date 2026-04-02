@@ -17,7 +17,7 @@ export interface AppState {
   octokit: Octokit;
   username: string;
   cache: Cache<WorkflowRun[]>;
-  rateLimit: { remaining: number; limit: number } | null;
+  rateLimit: { remaining: number; limit: number; checkedAt: Date } | null;
 }
 
 let state: AppState | null = null;
@@ -68,7 +68,7 @@ export async function refreshRuns(): Promise<void> {
   try {
     // Check rate limit before doing anything
     try {
-      state.rateLimit = await fetchRateLimit(state.octokit);
+      state.rateLimit = { ...await fetchRateLimit(state.octokit), checkedAt: new Date() };
     } catch {
       // Can't check rate limit — proceed cautiously
     }
@@ -132,7 +132,7 @@ export async function refreshRuns(): Promise<void> {
 
     // Update rate limit after the fetch
     try {
-      state.rateLimit = await fetchRateLimit(state.octokit);
+      state.rateLimit = { ...await fetchRateLimit(state.octokit), checkedAt: new Date() };
       console.log(
         `Refreshed ${runs.size} repos. API: ${state.rateLimit.remaining}/${state.rateLimit.limit} remaining`,
       );

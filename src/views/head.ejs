@@ -14,6 +14,9 @@
       <% if (typeof page !== 'undefined' && page === 'settings') { %>
         <a href="/">&larr; Dashboard</a>
       <% } else { %>
+        <% if (typeof rateLimit !== 'undefined' && rateLimit) { %>
+          <span class="rate-limit-badge" title="GitHub API rate limit as of <%= rateLimit.checkedAt.toLocaleTimeString() %>">API: <%= rateLimit.remaining %>/<%= rateLimit.limit %></span>
+        <% } %>
         <button
           type="button"
           class="btn-refresh-all"

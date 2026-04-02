@@ -30,7 +30,7 @@ vi.mock("../../state.js", () => ({
     octokit: {},
     username: "testuser",
     cache,
-    rateLimit: { remaining: 4999, limit: 5000 },
+    rateLimit: { remaining: 4999, limit: 5000, checkedAt: new Date() },
   }),
   updateConfig: (...args: unknown[]) => mockUpdateConfig(...args),
   refreshRuns: (...args: unknown[]) => mockRefreshRuns(...args),
