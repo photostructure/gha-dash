@@ -8,6 +8,11 @@
     <details class="current-repos" open>
       <summary>Currently monitoring <%= selectedRepos.length %> repos</summary>
       <form method="POST" action="/settings/repos" id="trim-form">
+        <div class="checkbox-helpers">
+          <button type="button" onclick="checkAll(this.closest('form'))">All</button>
+          <button type="button" onclick="checkNone(this.closest('form'))">None</button>
+          <button type="button" onclick="checkInverse(this.closest('form'))">Invert</button>
+        </div>
         <div class="repo-checkboxes">
           <% for (const repo of selectedRepos) { %>
             <label class="repo-item">
@@ -45,5 +50,17 @@
     </div>
   </div>
 </div>
+
+<script>
+function checkAll(form) {
+  form.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = true; });
+}
+function checkNone(form) {
+  form.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
+}
+function checkInverse(form) {
+  form.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = !cb.checked; });
+}
+</script>
 
 <%- include('foot') %>

@@ -1,3 +1,8 @@
+<div class="checkbox-helpers">
+  <button type="button" onclick="checkAll(this.closest('form'))">All</button>
+  <button type="button" onclick="checkNone(this.closest('form'))">None</button>
+  <button type="button" onclick="checkInverse(this.closest('form'))">Invert</button>
+</div>
 <div class="repo-checkboxes">
   <% for (const repo of repos) { %>
     <label class="repo-item">

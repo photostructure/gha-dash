@@ -256,6 +256,24 @@ th.sort-desc::after { content: ' \25BC'; }
 
 .org-buttons button:hover { background: var(--bg-alt); }
 
+.checkbox-helpers {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.checkbox-helpers button {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.checkbox-helpers button:hover { color: var(--text); border-color: var(--text-muted); }
+
 .repo-checkboxes { max-height: 500px; overflow-y: auto; }
 
 .repo-item {
