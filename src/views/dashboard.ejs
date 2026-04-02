@@ -1,0 +1,93 @@
+<%- include('head') %>
+
+<div class="dashboard">
+  <div class="toolbar">
+    <input
+      type="text"
+      id="search"
+      placeholder="Search workflows..."
+      aria-label="Search workflows"
+      oninput="filterTable(this.value)"
+    >
+  </div>
+
+  <table class="workflow-table">
+    <thead>
+      <tr>
+        <th scope="col">Workflow</th>
+        <th scope="col">Branch</th>
+        <th scope="col">Status</th>
+        <th scope="col">Commit</th>
+        <th scope="col">Message</th>
+        <th scope="col">Started</th>
+        <th scope="col">Duration</th>
+        <th scope="col" class="actions-col"></th>
+      </tr>
+    </thead>
+    <tbody
+      id="workflow-rows"
+      hx-get="/partials/workflows"
+      hx-trigger="every 30s"
+      hx-swap="innerHTML"
+      aria-live="polite"
+    >
+      <%- include('partials/workflow-table') %>
+    </tbody>
+  </table>
+
+  <% if (rateLimit) { %>
+    <footer class="rate-limit">
+      API: <%= rateLimit.remaining %> / <%= rateLimit.limit %> remaining
+    </footer>
+  <% } %>
+</div>
+
+<script>
+function filterTable(query) {
+  var q = query.toLowerCase();
+  document.querySelectorAll('#workflow-rows tr').forEach(function(row) {
+    if (row.classList.contains('repo-header')) {
+      row.style.display = '';
+    } else {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    }
+  });
+}
+
+document.body.addEventListener('htmx:afterSwap', function(e) {
+  if (e.detail.target.id === 'workflow-rows') {
+    restoreCollapseState();
+    var search = document.getElementById('search');
+    if (search && search.value) filterTable(search.value);
+  }
+});
+
+function toggleRepo(repo) {
+  var state = JSON.parse(localStorage.getItem('gha-dash-collapsed') || '{}');
+  state[repo] = !state[repo];
+  localStorage.setItem('gha-dash-collapsed', JSON.stringify(state));
+  applyCollapse(repo, state[repo]);
+}
+
+function applyCollapse(repo, collapsed) {
+  document.querySelectorAll('tr[data-repo="' + repo + '"]').forEach(function(row) {
+    row.style.display = collapsed ? 'none' : '';
+  });
+  var header = document.querySelector('tr[data-repo-header="' + repo + '"]');
+  if (header) {
+    header.setAttribute('aria-expanded', String(!collapsed));
+    header.querySelector('.collapse-icon').textContent = collapsed ? '\u25B6' : '\u25BC';
+  }
+}
+
+function restoreCollapseState() {
+  var state = JSON.parse(localStorage.getItem('gha-dash-collapsed') || '{}');
+  Object.keys(state).forEach(function(repo) {
+    if (state[repo]) applyCollapse(repo, true);
+  });
+}
+
+restoreCollapseState();
+</script>
+
+<%- include('foot') %>

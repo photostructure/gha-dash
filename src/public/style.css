@@ -1,0 +1,261 @@
+:root {
+  --bg: #fff;
+  --bg-alt: #f6f8fa;
+  --text: #1f2328;
+  --text-muted: #656d76;
+  --border: #d1d9e0;
+  --link: #0969da;
+  --success: #1a7f37;
+  --success-bg: #dafbe1;
+  --failure: #cf222e;
+  --failure-bg: #ffebe9;
+  --pending: #9a6700;
+  --pending-bg: #fff8c5;
+  --neutral: #656d76;
+  --neutral-bg: #eaeef2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --bg-alt: #161b22;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --border: #30363d;
+    --link: #58a6ff;
+    --success: #3fb950;
+    --success-bg: #12261e;
+    --failure: #f85149;
+    --failure-bg: #2d1214;
+    --pending: #d29922;
+    --pending-bg: #2e1f0f;
+    --neutral: #8b949e;
+    --neutral-bg: #21262d;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-size: 12px; }
+
+/* Header */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+header h1 { font-size: 18px; font-weight: 600; }
+header h1 a { color: var(--text); }
+header nav a { color: var(--text-muted); margin-left: 16px; }
+
+/* Dashboard */
+.dashboard { padding: 16px 24px; }
+
+.toolbar {
+  margin-bottom: 12px;
+}
+
+.toolbar input {
+  width: 100%;
+  max-width: 400px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Workflow Table */
+.workflow-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.workflow-table th {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg-alt);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.workflow-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.workflow-table tr:last-child td { border-bottom: none; }
+
+/* Repo group header */
+.repo-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.repo-header td {
+  padding: 10px 12px;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.repo-header:hover td { background: var(--border); }
+
+.collapse-icon {
+  display: inline-block;
+  width: 16px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-success { background: var(--success-bg); color: var(--success); }
+.status-failure { background: var(--failure-bg); color: var(--failure); }
+.status-in_progress, .status-queued, .status-waiting {
+  background: var(--pending-bg); color: var(--pending);
+}
+.status-cancelled, .status-skipped, .status-timed_out {
+  background: var(--neutral-bg); color: var(--neutral);
+}
+
+/* Message column truncation */
+.message-col {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions-col { width: 48px; text-align: center; }
+
+/* Error states */
+.error-badge {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--failure);
+}
+
+.error-banner {
+  padding: 8px 16px;
+  margin-bottom: 12px;
+  background: var(--failure-bg);
+  color: var(--failure);
+  border: 1px solid var(--failure);
+  border-radius: 6px;
+}
+
+.loading, .no-runs {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-muted);
+}
+
+.rate-limit {
+  margin-top: 12px;
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* Settings page */
+.settings { padding: 16px 24px; max-width: 800px; }
+.settings h2 { margin-bottom: 8px; }
+.settings p { color: var(--text-muted); margin-bottom: 16px; }
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 24px;
+}
+
+.org-buttons {
+  list-style: none;
+}
+
+.org-buttons button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.org-buttons button:hover { background: var(--bg-alt); }
+
+.repo-checkboxes { max-height: 500px; overflow-y: auto; }
+
+.repo-item {
+  display: block;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.repo-item:hover { background: var(--bg-alt); }
+.repo-name { font-weight: 500; }
+.repo-desc { display: block; font-size: 12px; color: var(--text-muted); }
+
+.hint { color: var(--text-muted); font-style: italic; }
+
+.btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+.btn-primary {
+  background: var(--link);
+  color: #fff;
+  border-color: var(--link);
+}
+
+.btn-primary:hover { opacity: 0.9; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .settings-layout { grid-template-columns: 1fr; }
+  .workflow-table { font-size: 12px; }
+  .message-col { max-width: 150px; }
+  header { padding: 8px 16px; }
+  .dashboard { padding: 8px 16px; }
+}

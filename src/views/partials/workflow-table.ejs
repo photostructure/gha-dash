@@ -1,0 +1,41 @@
+<% if (grouped.length === 0) { %>
+  <tr><td colspan="8" class="loading">Loading workflow data...</td></tr>
+<% } else { %>
+  <% for (const group of grouped) { %>
+    <tr
+      class="repo-header"
+      data-repo-header="<%= group.repo %>"
+      aria-expanded="true"
+      onclick="toggleRepo('<%= group.repo %>')"
+      role="button"
+      tabindex="0"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRepo('<%= group.repo %>')}"
+    >
+      <td colspan="8">
+        <span class="collapse-icon">&#x25BC;</span>
+        <strong><%= group.repo %></strong>
+        <% if (group.error) { %>
+          <span class="error-badge" title="<%= group.error %>">&#x26A0; error</span>
+        <% } %>
+      </td>
+    </tr>
+    <% for (const run of group.runs) { %>
+      <tr data-repo="<%= group.repo %>">
+        <td><a href="<%= run.htmlUrl %>" target="_blank" rel="noopener"><%= run.workflowName %></a></td>
+        <td><code><%= run.branch %></code></td>
+        <td>
+          <% const status = displayStatus(run); %>
+          <span
+            class="status-badge status-<%= status %>"
+            aria-label="Status: <%= status %>"
+          ><%= status %></span>
+        </td>
+        <td><code><%= run.commitSha %></code></td>
+        <td class="message-col"><%= run.commitMessage %></td>
+        <td title="<%= new Date(run.createdAt).toLocaleString() %>"><%= relativeTime(run.createdAt) %></td>
+        <td><%= formatDuration(run.duration) %></td>
+        <td class="actions-col"></td>
+      </tr>
+    <% } %>
+  <% } %>
+<% } %>
