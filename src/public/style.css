@@ -69,9 +69,15 @@ header nav a { color: var(--text-muted); margin-left: 16px; }
   margin-bottom: 12px;
 }
 
-.toolbar input {
-  width: 100%;
-  max-width: 400px;
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar input[type="text"] {
+  flex: 0 1 400px;
   padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -79,6 +85,16 @@ header nav a { color: var(--text-muted); margin-left: 16px; }
   background: var(--bg);
   color: var(--text);
 }
+
+.filter-toggle {
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.filter-toggle input { margin-right: 4px; vertical-align: middle; }
 
 /* Workflow Table */
 .workflow-table {
@@ -99,6 +115,12 @@ header nav a { color: var(--text-muted); margin-left: 16px; }
   color: var(--text-muted);
   white-space: nowrap;
 }
+
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sortable::after { content: ''; margin-left: 4px; }
+th.sort-asc::after { content: ' \25B2'; }
+th.sort-desc::after { content: ' \25BC'; }
 
 .workflow-table td {
   padding: 6px 12px;
@@ -191,7 +213,22 @@ header nav a { color: var(--text-muted); margin-left: 16px; }
 /* Settings page */
 .settings { padding: 16px 24px; max-width: 800px; }
 .settings h2 { margin-bottom: 8px; }
+.settings h3 { margin-top: 24px; margin-bottom: 12px; }
+.settings h4 { margin-bottom: 8px; }
 .settings p { color: var(--text-muted); margin-bottom: 16px; }
+
+.current-repos {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.current-repos summary {
+  cursor: pointer;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
 
 .settings-layout {
   display: grid;

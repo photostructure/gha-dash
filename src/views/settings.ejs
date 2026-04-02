@@ -2,11 +2,29 @@
 
 <div class="settings">
   <h2>Settings</h2>
-  <p>Select organizations and repos to monitor.</p>
+  <p>Select which repos to monitor. Uncheck repos to remove them from the dashboard.</p>
 
+  <% if (selectedRepos.length > 0) { %>
+    <details class="current-repos" open>
+      <summary>Currently monitoring <%= selectedRepos.length %> repos</summary>
+      <form method="POST" action="/settings/repos" id="trim-form">
+        <div class="repo-checkboxes">
+          <% for (const repo of selectedRepos) { %>
+            <label class="repo-item">
+              <input type="checkbox" name="repos" value="<%= repo %>" checked>
+              <span class="repo-name"><%= repo %></span>
+            </label>
+          <% } %>
+        </div>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </form>
+    </details>
+  <% } %>
+
+  <h3>Add repos</h3>
   <div class="settings-layout">
     <div class="org-list">
-      <h3>Organizations</h3>
+      <h4>Organizations</h4>
       <div
         hx-get="/partials/orgs"
         hx-trigger="load"
@@ -17,7 +35,7 @@
     </div>
 
     <div class="repo-list">
-      <h3>Repositories</h3>
+      <h4>Repositories</h4>
       <form method="POST" action="/settings/repos" id="repo-form">
         <div id="repo-container">
           <p class="hint">Select an organization to see its repos.</p>
