@@ -78,20 +78,26 @@ interface RepoGroup {
 
 function groupRunsByRepo(state: AppState): RepoGroup[] {
   const groups: RepoGroup[] = [];
+  const hidden = state.config.hiddenWorkflows.map((s: string) => s.toLowerCase());
 
   for (const [repo, entry] of state.cache.entries()) {
     const typed = entry as CacheEntry<WorkflowRun[]>;
-    // Skip repos with no runs and no error — they have no workflows
     if (typed.data.length === 0 && !typed.error) continue;
 
-    groups.push({
-      repo,
-      runs: typed.data,
-      error: typed.error,
-    });
+    // Filter out hidden workflows
+    const runs = hidden.length > 0
+      ? typed.data.filter((run) => {
+          const name = run.workflowName.toLowerCase();
+          return !hidden.some((h: string) => name.includes(h));
+        })
+      : typed.data;
+
+    // Skip repo entirely if all its runs were hidden
+    if (runs.length === 0 && !typed.error) continue;
+
+    groups.push({ repo, runs, error: typed.error });
   }
 
-  // Sort repos alphabetically
   groups.sort((a, b) => a.repo.localeCompare(b.repo));
   return groups;
 }

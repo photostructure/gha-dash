@@ -2,6 +2,7 @@ export interface AppConfig {
   repos: string[]; // "owner/repo" format; empty = show all
   availableRepos: string[]; // full set discovered from GitHub
   branches: Record<string, string>; // "owner/repo" → default branch name
+  hiddenWorkflows: string[]; // hide workflows whose name contains any of these (case-insensitive)
   refreshInterval: number; // seconds, default 300
   rateLimitFloor: number; // stop refreshing below this many remaining calls
   rateBudgetPct: number; // use at most this % of remaining rate limit per cycle
@@ -12,6 +13,7 @@ export const defaultConfig: AppConfig = {
   repos: [],
   availableRepos: [],
   branches: {},
+  hiddenWorkflows: ["dependabot"],
   refreshInterval: 3600,
   rateLimitFloor: 500,
   rateBudgetPct: 50,
