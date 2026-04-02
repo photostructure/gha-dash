@@ -5,7 +5,10 @@
 
   <% if (availableRepos.length > 0) { %>
   <details open>
-    <summary><strong>Repos</strong> &mdash; <%= selectedRepos.length %> of <%= availableRepos.length %> selected</summary>
+    <summary class="settings-summary">
+      <strong>Repos</strong> &mdash; <%= selectedRepos.length %> of <%= availableRepos.length %> selected
+      <button type="submit" form="repo-form" class="btn btn-primary btn-sm">Save repos</button>
+    </summary>
     <form method="POST" action="/settings/repos" id="repo-form">
       <div class="toolbar">
         <input type="text" id="repo-search" placeholder="Filter repos..." aria-label="Filter repos" oninput="filterRepos(this.value)">
@@ -34,7 +37,6 @@
           <% } %>
         </tbody>
       </table>
-      <button type="submit" class="btn btn-primary">Save repos</button>
     </form>
   </details>
   <% } else { %>
@@ -42,8 +44,11 @@
   <% } %>
 
   <details open>
-    <summary><strong>General</strong></summary>
-    <form method="POST" action="/settings/config" class="config-form">
+    <summary class="settings-summary">
+      <strong>General</strong>
+      <button type="submit" form="config-form" class="btn btn-primary btn-sm">Save settings</button>
+    </summary>
+    <form method="POST" action="/settings/config" class="config-form" id="config-form">
       <div class="form-field">
         <label for="refreshInterval">Refresh interval (seconds)</label>
         <input type="number" id="refreshInterval" name="refreshInterval" value="<%= config.refreshInterval %>" min="60">
@@ -68,7 +73,6 @@
         <input type="text" id="hiddenWorkflows" name="hiddenWorkflows" value="<%= config.hiddenWorkflows.join(', ') %>">
         <small class="field-help">Comma-separated. Hides workflows whose name contains any of these (case-insensitive).</small>
       </div>
-      <button type="submit" class="btn btn-primary">Save</button>
     </form>
   </details>
 </div>
