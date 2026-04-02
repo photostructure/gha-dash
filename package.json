@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/cli.ts",
-    "build": "tsup",
+    "build": "tsup && printf '#!/usr/bin/env node\\n' | cat - dist/cli.js > dist/cli.tmp && mv dist/cli.tmp dist/cli.js && cp -r src/views dist/views && cp -r src/public dist/public",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/"
@@ -20,6 +20,9 @@
     "workflow",
     "ci",
     "cd"
+  ],
+  "files": [
+    "dist/"
   ],
   "license": "Apache-2.0",
   "engines": {
