@@ -230,7 +230,13 @@ function restoreCollapseState() {
   });
 }
 
+function clearFilters() {
+  var cb = document.getElementById('failures-only');
+  if (cb.checked) { cb.checked = false; applyFilters(); }
+}
+
 function expandAll() {
+  clearFilters();
   var state = {};
   document.querySelectorAll('.repo-header').forEach(function(h) {
     var repo = h.getAttribute('data-repo-header');
@@ -241,6 +247,7 @@ function expandAll() {
 }
 
 function collapseAll() {
+  clearFilters();
   var state = {};
   document.querySelectorAll('.repo-header').forEach(function(h) {
     var repo = h.getAttribute('data-repo-header');
