@@ -9,7 +9,9 @@ import { defaultConfig } from "../../types.js";
 const testDir = join(tmpdir(), `gha-dash-test-${process.pid}`);
 
 beforeEach(() => {
+  // Stub both so it works on Windows (APPDATA) and Unix (XDG_CONFIG_HOME)
   vi.stubEnv("XDG_CONFIG_HOME", testDir);
+  vi.stubEnv("APPDATA", testDir);
 });
 
 afterEach(async () => {

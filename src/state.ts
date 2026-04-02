@@ -105,7 +105,6 @@ export async function refreshRuns(): Promise<void> {
     const { runs, errors, discoveredBranches } = await fetchAllRuns(
       state.octokit,
       repos,
-      state.config.lookbackDays,
       state.config.branches,
       maxRepos,
     );
@@ -226,7 +225,6 @@ export async function refreshRepo(fullName: string): Promise<void> {
       owner,
       repo,
       branch,
-      state.config.lookbackDays,
     );
 
     if (runs.length > 0) {

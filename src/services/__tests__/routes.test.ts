@@ -26,7 +26,7 @@ const mockRefreshRuns = vi.fn();
 
 vi.mock("../../state.js", () => ({
   getAppState: () => ({
-    config: { repos: ["owner/repo"], availableRepos: ["owner/repo", "owner/other"], branches: {}, refreshInterval: 60, lookbackDays: 7, rateLimitFloor: 500, rateBudgetPct: 50, port: 3131 },
+    config: { repos: ["owner/repo"], availableRepos: ["owner/repo", "owner/other"], branches: {}, refreshInterval: 60, rateLimitFloor: 500, rateBudgetPct: 50, port: 3131 },
     octokit: {},
     username: "testuser",
     cache,

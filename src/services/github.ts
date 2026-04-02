@@ -83,11 +83,7 @@ export async function fetchWorkflowRuns(
   owner: string,
   repo: string,
   branch: string,
-  lookbackDays: number,
 ): Promise<WorkflowRun[]> {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - lookbackDays);
-
   const { data } = await octokit.actions.listWorkflowRunsForRepo({
     owner,
     repo,
@@ -96,11 +92,11 @@ export async function fetchWorkflowRuns(
   });
 
   // Deduplicate by (workflow_id, branch) — keep the most recent run
+  // No lookback filter: we always show the latest run per workflow,
+  // even if it's old. This prevents repos from disappearing.
   const seen = new Map<string, WorkflowRun>();
 
   for (const run of data.workflow_runs) {
-    if (new Date(run.created_at) < cutoff) continue;
-
     const key = `${run.workflow_id}:${run.head_branch}`;
     if (seen.has(key)) continue; // runs are sorted newest-first
 
@@ -150,7 +146,6 @@ export interface FetchResult {
 export async function fetchAllRuns(
   octokit: Octokit,
   repos: string[],
-  lookbackDays: number,
   cachedBranches: Record<string, string>,
   maxRepos?: number,
 ): Promise<FetchResult> {
@@ -187,7 +182,6 @@ export async function fetchAllRuns(
             owner,
             repo,
             branch,
-            lookbackDays,
           );
           runs.set(fullName, result);
         } catch (err) {

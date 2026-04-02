@@ -92,14 +92,13 @@ describe("fetchWorkflowRuns", () => {
       "owner",
       "repo",
       "main",
-      7,
     );
 
     expect(runs).toHaveLength(2);
     expect(runs.map((r) => r.branch).sort()).toEqual(["feature", "main"]);
   });
 
-  it("filters out runs older than lookbackDays", async () => {
+  it("keeps old runs (no lookback filter — latest per workflow)", async () => {
     server.use(
       http.get(
         "https://api.github.com/repos/owner/repo/actions/runs",
@@ -120,11 +119,10 @@ describe("fetchWorkflowRuns", () => {
       "owner",
       "repo",
       "main",
-      7,
     );
 
-    expect(runs).toHaveLength(1);
-    expect(runs[0].workflowId).toBe(100);
+    // Both kept — different workflow_ids, each is the latest for its workflow
+    expect(runs).toHaveLength(2);
   });
 
   it("computes duration for completed runs", async () => {
@@ -153,7 +151,6 @@ describe("fetchWorkflowRuns", () => {
       "owner",
       "repo",
       "main",
-      365,
     );
 
     expect(runs[0].duration).toBe(300_000); // 5 minutes in ms
