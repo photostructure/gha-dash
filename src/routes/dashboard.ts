@@ -8,8 +8,13 @@ export function dashboardRoutes(): Router {
   router.get("/", (_req, res) => {
     const state = getAppState();
     const grouped = groupRunsByRepo(state);
+    const errors = grouped
+      .filter((g) => g.error)
+      .map((g) => ({ repo: g.repo, message: g.error! }));
+
     res.render("dashboard", {
       grouped,
+      errors,
       displayStatus,
       formatDuration,
       relativeTime,
