@@ -2,12 +2,23 @@
 
 ## Project Overview
 
-A GitHub Actions dashboard application. Licensed under Apache 2.0.
+A GitHub Actions dashboard that shows workflow status across multiple
+orgs/accounts. The only prerequisite is an authenticated `gh` CLI.
+Licensed under Apache 2.0.
+
+## Architecture
+
+See `docs/ARCHITECTURE.md` for the tech stack, core types, routes, security
+constraints, and consolidated lore/gotchas.
+
+## Active TPPs
+
+- `_todo/20260401-phase1-dashboard.md` — Server + dashboard + settings (Phase 1)
+- `_todo/20260401-phase2-dispatch.md` — Workflow dispatch forms (Phase 2)
 
 ## TPP Workflow
 
-This project uses Technical Project Plans (TPPs) to preserve context between
-sessions. See `docs/TPP-GUIDE.md` for the full guide.
+See `docs/TPP-GUIDE.md` for the full guide.
 
 - Active TPPs live in `_todo/*.md`
 - Completed TPPs live in `_done/*.md`
@@ -26,6 +37,8 @@ Key points:
 
 ## Conventions
 
+- TypeScript with strict mode, ESM (`"type": "module"`)
+- Test with vitest + msw (Mock Service Worker)
 - Write clear commit messages explaining "why" not "what"
 - Keep files focused and reasonably sized
 - Add tests for new functionality
