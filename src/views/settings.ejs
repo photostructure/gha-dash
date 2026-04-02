@@ -1,80 +1,79 @@
 <%- include('head') %>
 
 <div class="settings">
-  <h2>Settings</h2>
+  <form method="POST" action="/settings/all" id="settings-form">
+    <div class="settings-header">
+      <h2>Settings</h2>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
 
-  <% if (availableRepos.length > 0) { %>
-  <details open>
-    <summary class="settings-summary">
-      <strong>Repos</strong> &mdash; <%= selectedRepos.length %> of <%= availableRepos.length %> selected
-      <button type="submit" form="repo-form" class="btn btn-primary btn-sm">Save repos</button>
-    </summary>
-    <form method="POST" action="/settings/repos" id="repo-form">
-      <div class="toolbar">
-        <input type="text" id="repo-search" placeholder="Filter repos..." aria-label="Filter repos" oninput="filterRepos(this.value)">
-        <div class="checkbox-helpers">
-          <button type="button" onclick="checkAll()">All</button>
-          <button type="button" onclick="checkNone()">None</button>
-          <button type="button" onclick="checkInverse()">Invert</button>
+    <% if (availableRepos.length > 0) { %>
+    <details open>
+      <summary><strong>Repos</strong> &mdash; <%= selectedRepos.length %> of <%= availableRepos.length %> selected</summary>
+      <div class="settings-section">
+        <div class="toolbar">
+          <input type="text" id="repo-search" placeholder="Filter repos..." aria-label="Filter repos" oninput="filterRepos(this.value)">
+          <div class="checkbox-helpers">
+            <button type="button" onclick="checkAll()">All</button>
+            <button type="button" onclick="checkNone()">None</button>
+            <button type="button" onclick="checkInverse()">Invert</button>
+          </div>
+        </div>
+        <table class="settings-table" id="settings-table">
+          <thead>
+            <tr>
+              <th scope="col" class="sortable" data-sort="selected" onclick="sortSettings('selected')">&#x2713;</th>
+              <th scope="col" class="sortable" data-sort="owner" onclick="sortSettings('owner')">Owner</th>
+              <th scope="col" class="sortable sort-active sort-asc" data-sort="repo" onclick="sortSettings('repo')">Repo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (const repo of availableRepos) { %>
+              <% const [owner, name] = repo.split('/'); %>
+              <tr data-owner="<%= owner %>" data-repo="<%= name %>">
+                <td class="check-col"><input type="checkbox" name="repos" value="<%= repo %>" <%= selectedRepos.includes(repo) ? 'checked' : '' %>></td>
+                <td><%= owner %></td>
+                <td><%= name %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <% } else { %>
+      <p class="hint">No repos discovered yet — refresh the dashboard first.</p>
+    <% } %>
+
+    <details open>
+      <summary><strong>General</strong></summary>
+      <div class="settings-section config-form">
+        <div class="form-field">
+          <label for="refreshInterval">Refresh interval (seconds)</label>
+          <input type="number" id="refreshInterval" name="refreshInterval" value="<%= config.refreshInterval %>" min="60">
+        </div>
+        <div class="form-field">
+          <label for="rateLimitFloor">Rate limit floor</label>
+          <input type="number" id="rateLimitFloor" name="rateLimitFloor" value="<%= config.rateLimitFloor %>" min="0">
+          <small class="field-help">Stop refreshing when remaining API calls drop below this number.</small>
+        </div>
+        <div class="form-field">
+          <label for="rateBudgetPct">Rate budget per cycle (%)</label>
+          <input type="number" id="rateBudgetPct" name="rateBudgetPct" value="<%= config.rateBudgetPct %>" min="1" max="100">
+          <small class="field-help">Max percentage of rate limit to use per refresh cycle.</small>
+        </div>
+        <div class="form-field">
+          <label for="port">Port</label>
+          <input type="number" id="port" name="port" value="<%= config.port %>" min="1" max="65535">
+          <small class="field-help">Takes effect on next restart.</small>
+        </div>
+        <div class="form-field">
+          <label for="hiddenWorkflows">Hidden workflows</label>
+          <input type="text" id="hiddenWorkflows" name="hiddenWorkflows" value="<%= config.hiddenWorkflows.join(', ') %>">
+          <small class="field-help">Comma-separated. Hides workflows whose name contains any of these (case-insensitive).</small>
         </div>
       </div>
-      <table class="settings-table" id="settings-table">
-        <thead>
-          <tr>
-            <th scope="col" class="sortable" data-sort="selected" onclick="sortSettings('selected')">&#x2713;</th>
-            <th scope="col" class="sortable" data-sort="owner" onclick="sortSettings('owner')">Owner</th>
-            <th scope="col" class="sortable sort-active sort-asc" data-sort="repo" onclick="sortSettings('repo')">Repo</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% for (const repo of availableRepos) { %>
-            <% const [owner, name] = repo.split('/'); %>
-            <tr data-owner="<%= owner %>" data-repo="<%= name %>">
-              <td class="check-col"><input type="checkbox" name="repos" value="<%= repo %>" <%= selectedRepos.includes(repo) ? 'checked' : '' %>></td>
-              <td><%= owner %></td>
-              <td><%= name %></td>
-            </tr>
-          <% } %>
-        </tbody>
-      </table>
-    </form>
-  </details>
-  <% } else { %>
-    <p class="hint">No repos discovered yet — refresh the dashboard first.</p>
-  <% } %>
-
-  <details open>
-    <summary class="settings-summary">
-      <strong>General</strong>
-      <button type="submit" form="config-form" class="btn btn-primary btn-sm">Save settings</button>
-    </summary>
-    <form method="POST" action="/settings/config" class="config-form" id="config-form">
-      <div class="form-field">
-        <label for="refreshInterval">Refresh interval (seconds)</label>
-        <input type="number" id="refreshInterval" name="refreshInterval" value="<%= config.refreshInterval %>" min="60">
-      </div>
-      <div class="form-field">
-        <label for="rateLimitFloor">Rate limit floor</label>
-        <input type="number" id="rateLimitFloor" name="rateLimitFloor" value="<%= config.rateLimitFloor %>" min="0">
-        <small class="field-help">Stop refreshing when remaining API calls drop below this number.</small>
-      </div>
-      <div class="form-field">
-        <label for="rateBudgetPct">Rate budget per cycle (%)</label>
-        <input type="number" id="rateBudgetPct" name="rateBudgetPct" value="<%= config.rateBudgetPct %>" min="1" max="100">
-        <small class="field-help">Max percentage of rate limit to use per refresh cycle.</small>
-      </div>
-      <div class="form-field">
-        <label for="port">Port</label>
-        <input type="number" id="port" name="port" value="<%= config.port %>" min="1" max="65535">
-        <small class="field-help">Takes effect on next restart.</small>
-      </div>
-      <div class="form-field">
-        <label for="hiddenWorkflows">Hidden workflows</label>
-        <input type="text" id="hiddenWorkflows" name="hiddenWorkflows" value="<%= config.hiddenWorkflows.join(', ') %>">
-        <small class="field-help">Comma-separated. Hides workflows whose name contains any of these (case-insensitive).</small>
-      </div>
-    </form>
-  </details>
+    </details>
+  </form>
 </div>
 
 <script>

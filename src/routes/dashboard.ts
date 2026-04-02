@@ -36,35 +36,39 @@ export function dashboardRoutes(): Router {
   // POST /refresh — refresh all repos
   router.post("/refresh", async (_req, res) => {
     await refreshRuns();
-    const state = getAppState();
-    const grouped = groupRunsByRepo(state);
-    res.render("partials/workflow-table", {
-      grouped,
-      displayStatus,
-      formatDuration,
-      relativeTime,
-    });
+    renderRefreshResponse(res);
   });
 
-  // POST /refresh/:owner/:repo — refresh a single repo
+  // POST /refresh/:owner/:repo — refresh a single repo (no DOM swap)
   router.post("/refresh/:owner/:repo", async (req, res, next) => {
     try {
       const fullName = `${req.params.owner}/${req.params.repo}`;
       await refreshRepo(fullName);
-      const state = getAppState();
-      const grouped = groupRunsByRepo(state);
-      res.render("partials/workflow-table", {
-        grouped,
-        displayStatus,
-        formatDuration,
-        relativeTime,
-      });
+      // Return 204 — data is updated in cache, next HTMX poll will pick it up.
+      // This avoids replacing the entire tbody which destroys collapse state.
+      res.status(204).end();
     } catch (err) {
       next(err);
     }
   });
 
   return router;
+}
+
+function renderRefreshResponse(res: import("express").Response): void {
+  const state = getAppState();
+  const grouped = groupRunsByRepo(state);
+  const tableVars = { grouped, displayStatus, formatDuration, relativeTime };
+
+  // Render workflow table + OOB rate limit badge update
+  res.app.render("partials/workflow-table", tableVars, (err, tableHtml) => {
+    if (err) { res.status(500).send(err.message); return; }
+
+    res.app.render("partials/rate-limit", { rateLimit: state.rateLimit }, (err2, rlHtml) => {
+      const rlOob = err2 ? "" : `<span id="rate-limit-badge" hx-swap-oob="innerHTML">${rlHtml}</span>`;
+      res.send(tableHtml + rlOob);
+    });
+  });
 }
 
 import type { WorkflowRun, CacheEntry } from "../types.js";

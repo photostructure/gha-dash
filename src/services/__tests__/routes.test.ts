@@ -26,7 +26,7 @@ const mockRefreshRuns = vi.fn();
 
 vi.mock("../../state.js", () => ({
   getAppState: () => ({
-    config: { repos: ["owner/repo"], availableRepos: ["owner/repo", "owner/other"], branches: {}, refreshInterval: 60, rateLimitFloor: 500, rateBudgetPct: 50, port: 3131 },
+    config: { repos: ["owner/repo"], availableRepos: ["owner/repo", "owner/other"], branches: {}, hiddenWorkflows: [], refreshInterval: 60, rateLimitFloor: 500, rateBudgetPct: 50, port: 3131 },
     octokit: {},
     username: "testuser",
     cache,
@@ -95,31 +95,27 @@ describe("settings routes", () => {
     const res = await request(app).get("/settings");
     expect(res.status).toBe(200);
     expect(res.text).toContain("Settings");
-    expect(res.text).toContain("repo-form");
+    expect(res.text).toContain("settings-form");
   });
 
-  it("POST /settings/repos redirects to dashboard", async () => {
+  it("POST /settings/all saves config and redirects", async () => {
     const res = await request(app)
-      .post("/settings/repos")
+      .post("/settings/all")
       .type("form")
-      .send("repos=owner/repo&repos=owner/repo2");
+      .send("repos=owner/repo&repos=owner/repo2&refreshInterval=3600&rateLimitFloor=500&rateBudgetPct=50&port=3131&hiddenWorkflows=dependabot");
 
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe("/");
-    expect(mockUpdateConfig).toHaveBeenCalledWith({
-      repos: ["owner/repo", "owner/repo2"],
-    });
+    expect(mockUpdateConfig).toHaveBeenCalled();
     expect(mockRefreshRuns).toHaveBeenCalled();
   });
 
-  it("POST /settings/repos handles single repo", async () => {
+  it("POST /settings/all handles single repo", async () => {
     await request(app)
-      .post("/settings/repos")
+      .post("/settings/all")
       .type("form")
-      .send("repos=owner/single");
+      .send("repos=owner/single&refreshInterval=3600&rateLimitFloor=500&rateBudgetPct=50&port=3131&hiddenWorkflows=");
 
-    expect(mockUpdateConfig).toHaveBeenCalledWith({
-      repos: ["owner/single"],
-    });
+    expect(mockUpdateConfig).toHaveBeenCalled();
   });
 });

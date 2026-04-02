@@ -1,0 +1,7 @@
+<% if (typeof rateLimit !== 'undefined' && rateLimit) { %>
+  <%
+    const pct = rateLimit.remaining / rateLimit.limit;
+    const rlClass = pct > 0.5 ? 'rl-ok' : pct > 0.2 ? 'rl-warn' : 'rl-danger';
+  %>
+  <span class="rate-limit-badge <%= rlClass %>" title="as of <%= rateLimit.checkedAt.toLocaleTimeString() %>">API: <%= rateLimit.remaining %>/<%= rateLimit.limit %></span>
+<% } %>

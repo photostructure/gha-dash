@@ -292,7 +292,18 @@ th.sort-desc::after { content: ' \25BC'; }
 
 /* Settings page */
 .settings { padding: 16px 24px; max-width: 700px; }
-.settings h2 { margin-bottom: 16px; }
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding: 8px 0 12px;
+}
+
+.settings-header h2 { margin: 0; }
 
 .settings details {
   border: 1px solid var(--border);
@@ -308,26 +319,13 @@ th.sort-desc::after { content: ' \25BC'; }
   user-select: none;
 }
 
-.settings-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.btn-sm { padding: 4px 12px; font-size: 12px; margin-top: 0; }
+.settings-section { padding: 14px; }
 
 .settings details[open] summary {
   border-bottom: 1px solid var(--border);
   border-radius: 6px 6px 0 0;
 }
 
-.settings details > form,
-.settings details > .hint {
-  padding: 14px;
-}
 
 .checkbox-helpers {
   display: flex;

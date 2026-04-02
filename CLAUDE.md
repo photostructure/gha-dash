@@ -87,6 +87,13 @@ This is the most important operational concern. GitHub allows 5000 requests/hour
 (`gh api /rate_limit --jq '.rate'`), then restart. Use `--no-open` to prevent
 the browser from triggering extra requests.
 
+## Workflow
+
+- **Always ask the user to verify changes work before committing.** Don't
+  jump straight to `git commit` after making changes — ask "does this work?"
+  first. UI changes especially need manual verification.
+- Never commit or push without asking first.
+
 ## Conventions
 
 - TypeScript strict mode, ESM (`import` with `.js` extensions)

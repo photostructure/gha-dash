@@ -190,14 +190,18 @@ function parseDurationForSort(text) {
 }
 
 // --- Collapse State ---
-document.body.addEventListener('htmx:afterSwap', function(e) {
-  if (e.detail.target.id === 'workflow-rows') {
+// Restore UI state after HTMX swaps new rows into the tbody
+var _restoringState = false;
+document.body.addEventListener('htmx:afterSettle', function() {
+  if (_restoringState) return;
+  _restoringState = true;
+  setTimeout(function() {
     restoreCollapseState();
     applyFilters();
-    // Re-sort after new data
     sortTable();
     updateSortIndicators();
-  }
+    _restoringState = false;
+  }, 0);
 });
 
 function toggleRepo(repo) {
