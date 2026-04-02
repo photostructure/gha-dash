@@ -65,9 +65,12 @@ header nav a { color: var(--text-muted); }
 
 .rate-limit-badge {
   font-size: 11px;
-  color: var(--text-muted);
   margin-right: 8px;
 }
+
+.rl-ok { color: var(--success); }
+.rl-warn { color: var(--pending); }
+.rl-danger { color: var(--failure); }
 
 .btn-refresh-all {
   background: none;
