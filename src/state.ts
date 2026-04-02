@@ -68,16 +68,20 @@ export async function refreshRuns(): Promise<void> {
       console.log(`Discovered ${repos.length} repos, saved to config`);
     }
 
-    const results = await fetchAllRuns(
+    const { runs, errors } = await fetchAllRuns(
       state.octokit,
       repos,
       state.config.lookbackDays,
     );
 
-    for (const [repo, runs] of results) {
-      if (runs.length > 0) {
-        state.cache.set(repo, runs);
+    for (const [repo, repoRuns] of runs) {
+      if (repoRuns.length > 0) {
+        state.cache.set(repo, repoRuns);
       }
+    }
+
+    for (const [repo, message] of errors) {
+      state.cache.setError(repo, message);
     }
 
     // Persist cache to disk
@@ -94,7 +98,19 @@ export async function refreshRuns(): Promise<void> {
       // Non-critical
     }
   } catch (err) {
-    console.error("Refresh failed:", (err as Error).message);
+    const status = (err as { status?: number }).status;
+    if (status === 401) {
+      // Token expired — try re-extracting
+      try {
+        const newToken = extractToken();
+        state.octokit = createOctokit(newToken);
+        console.log("Re-extracted GitHub token after 401");
+      } catch {
+        console.error("Token expired and re-extraction failed. Run: gh auth login");
+      }
+    } else {
+      console.error("Refresh failed:", (err as Error).message);
+    }
   } finally {
     refreshing = false;
   }

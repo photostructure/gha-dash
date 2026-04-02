@@ -129,14 +129,20 @@ export async function fetchWorkflowRuns(
   return [...seen.values()];
 }
 
+export interface FetchResult {
+  runs: Map<string, WorkflowRun[]>;
+  errors: Map<string, string>;
+}
+
 /** Fetch runs for many repos in parallel, capped at API_CONCURRENCY */
 export async function fetchAllRuns(
   octokit: Octokit,
   repos: string[],
   lookbackDays: number,
-): Promise<Map<string, WorkflowRun[]>> {
+): Promise<FetchResult> {
   const limit = pLimit(API_CONCURRENCY);
-  const results = new Map<string, WorkflowRun[]>();
+  const runs = new Map<string, WorkflowRun[]>();
+  const errors = new Map<string, string>();
 
   await Promise.all(
     repos.map((fullName) =>
@@ -144,22 +150,20 @@ export async function fetchAllRuns(
         const [owner, repo] = fullName.split("/");
         try {
           const branch = await fetchDefaultBranch(octokit, owner, repo);
-          const runs = await fetchWorkflowRuns(
+          const result = await fetchWorkflowRuns(
             octokit,
             owner,
             repo,
             branch,
             lookbackDays,
           );
-          results.set(fullName, runs);
+          runs.set(fullName, result);
         } catch (err) {
-          // Store error as empty runs — the cache layer records the error
-          results.set(fullName, []);
-          throw err;
+          errors.set(fullName, (err as Error).message);
         }
       }),
-    ).map((p) => p.catch(() => {})), // Don't let one repo failure abort all
+    ),
   );
 
-  return results;
+  return { runs, errors };
 }
