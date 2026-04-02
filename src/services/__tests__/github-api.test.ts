@@ -63,6 +63,7 @@ describe("fetchWorkflowRuns", () => {
       run_started_at: createdAt.toISOString(),
       html_url: `https://github.com/owner/repo/actions/runs/${id}`,
       display_title: `Run #${id}`,
+      path: `.github/workflows/workflow-${workflowId}.yml`,
       ...overrides,
     };
   }

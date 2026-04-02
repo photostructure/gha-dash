@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import express from "express";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { settingsRoutes } from "./routes/settings.js";
+import { dispatchRoutes } from "./routes/dispatch.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -29,6 +30,7 @@ export function createApp() {
   // Routes
   app.use("/", dashboardRoutes());
   app.use("/", settingsRoutes());
+  app.use("/", dispatchRoutes());
 
   return app;
 }

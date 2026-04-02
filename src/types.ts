@@ -24,6 +24,7 @@ export interface WorkflowRun {
   duration: number; // milliseconds
   createdAt: string; // ISO 8601
   htmlUrl: string;
+  workflowPath: string; // e.g. ".github/workflows/ci.yml"
 }
 
 export type RunStatus = "completed" | "in_progress" | "queued" | "waiting";
@@ -38,6 +39,21 @@ export interface CacheEntry<T> {
   data: T;
   fetchedAt: number; // Date.now()
   error: string | null; // last refresh error, if any
+}
+
+export interface DispatchInput {
+  name: string;
+  type: "string" | "choice" | "boolean" | "environment";
+  description: string;
+  required: boolean;
+  default: string;
+  options: string[]; // for choice type
+}
+
+export interface WorkflowDispatchInfo {
+  workflowId: number;
+  workflowName: string;
+  inputs: DispatchInput[];
 }
 
 /** Effective status for display: merges status + conclusion */

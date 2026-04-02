@@ -34,7 +34,20 @@
         <td class="message-col"><%= run.commitMessage %></td>
         <td title="<%= new Date(run.createdAt).toLocaleString() %>"><%= relativeTime(run.createdAt) %></td>
         <td><%= formatDuration(run.duration) %></td>
-        <td class="actions-col"></td>
+        <td class="actions-col">
+          <button
+            type="button"
+            class="btn-dispatch"
+            hx-get="/dispatch/<%= run.repo.split('/')[0] %>/<%= run.repo.split('/')[1] %>/<%= run.workflowId %>"
+            hx-target="#dispatch-row-<%= run.workflowId %>-<%= run.branch.replace(/[^a-zA-Z0-9]/g, '-') %>"
+            hx-swap="innerHTML"
+            title="Run workflow"
+            aria-label="Run <%= run.workflowName %>"
+          >&#x25B6;</button>
+        </td>
+      </tr>
+      <tr id="dispatch-row-<%= run.workflowId %>-<%= run.branch.replace(/[^a-zA-Z0-9]/g, '-') %>" class="dispatch-row" data-repo="<%= run.repo %>">
+        <td colspan="8"></td>
       </tr>
     <% } %>
   <% } %>

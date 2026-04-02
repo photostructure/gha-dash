@@ -123,6 +123,7 @@ export async function fetchWorkflowRuns(
       duration,
       createdAt: run.created_at,
       htmlUrl: run.html_url,
+      workflowPath: run.path ?? "",
     });
   }
 
