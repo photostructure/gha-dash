@@ -73,8 +73,10 @@ header nav a { color: var(--text-muted); }
   font-size: 13px;
 }
 
+.btn-refresh-all { display: inline-flex; align-items: center; gap: 4px; }
 .btn-refresh-all:hover { color: var(--link); border-color: var(--link); }
 .btn-refresh-all.htmx-request { font-size: 0; border-color: transparent; padding: 4px 14px; }
+.btn-refresh-all.htmx-request svg { display: none; }
 .btn-refresh-all.htmx-request::after {
   content: '';
   display: inline-block;
@@ -186,8 +188,11 @@ th.sort-desc::after { content: ' \25BC'; }
   vertical-align: middle;
 }
 
+.btn-refresh { display: inline-flex; align-items: center; }
+
 .btn-refresh:hover { color: var(--link); }
 .btn-refresh.htmx-request { font-size: 0; }
+.btn-refresh.htmx-request svg { display: none; }
 .btn-refresh.htmx-request::after {
   content: '';
   display: inline-block;
