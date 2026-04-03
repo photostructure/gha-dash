@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RepoGroup } from "../composables/useWorkflows";
+import { displayStatus } from "../../types.js";
 import WorkflowRow from "./WorkflowRow.vue";
 import RefreshIcon from "./RefreshIcon.vue";
 
@@ -36,6 +37,15 @@ function onKeydown(e: KeyboardEvent) {
       <span class="collapse-icon">{{ collapsed ? "\u25B6" : "\u25BC" }}</span>
       <strong>{{ group.repo }}</strong>
       <span v-if="group.error" class="error-badge" :title="group.error">&#x26A0; error</span>
+      <span v-if="collapsed" class="status-dots">
+        <span
+          v-for="run in group.runs"
+          :key="run.workflowId"
+          class="status-dot"
+          :class="`dot-${displayStatus(run)}`"
+          :title="`${run.workflowName}: ${displayStatus(run)}`"
+        ></span>
+      </span>
       <button
         type="button"
         class="btn-refresh"

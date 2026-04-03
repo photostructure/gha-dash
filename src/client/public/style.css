@@ -186,6 +186,27 @@ th.sort-desc::after { content: ' \25BC'; }
   color: var(--text-muted);
 }
 
+/* Collapsed status dots */
+.status-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-success { background: var(--success); }
+.dot-failure { background: var(--failure); }
+.dot-in_progress, .dot-queued, .dot-waiting { background: var(--pending); }
+.dot-cancelled, .dot-skipped, .dot-timed_out { background: var(--neutral); }
+
 .btn-refresh {
   background: none;
   border: none;
@@ -474,6 +495,16 @@ th.sort-desc::after { content: ' \25BC'; }
 .dispatch-result { padding: 12px; border-radius: 6px; margin: 8px 0; }
 .dispatch-success { background: var(--success-bg); color: var(--success); }
 .dispatch-error { background: var(--failure-bg); color: var(--failure); }
+
+/* Footer */
+.app-footer {
+  text-align: center;
+  padding: 16px 24px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+}
 
 /* Responsive */
 @media (max-width: 768px) {
