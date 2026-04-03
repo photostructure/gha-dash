@@ -12,7 +12,7 @@ Licensed under Apache 2.0.
 
 ```bash
 npm install
-npm run dev:all   # Express (tsx watch) + Vite dev server
+npm run dev       # Express (tsx watch) + Vite dev server
 npm test          # vitest (56 tests)
 npm run build     # tsup (server) + vite (client) → dist/
 ```

@@ -25,13 +25,19 @@ export function createApp() {
   // API routes
   app.use("/api", apiRoutes());
 
-  // Vue SPA — serve built client assets and fallback to index.html
+  // Vue SPA — serve built client assets and fallback to index.html.
+  // Check for assets/ subdir to distinguish built output from src/client/.
   const clientDir = join(__dirname, "client");
-  if (existsSync(clientDir)) {
+  if (existsSync(join(clientDir, "assets"))) {
     app.use(express.static(clientDir));
     app.get("/{*path}", (req, res, next) => {
       if (req.path.startsWith("/api/")) return next();
       res.sendFile(join(clientDir, "index.html"));
+    });
+  } else {
+    // Dev mode: no built SPA
+    app.get("/", (_req, res) => {
+      res.type("text").send("Run 'npm run dev' to start both Express and Vite, then open http://localhost:5173");
     });
   }
 

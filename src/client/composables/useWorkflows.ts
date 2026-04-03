@@ -29,15 +29,16 @@ export function useWorkflows(pollIntervalMs = 30_000) {
 
   let timer: ReturnType<typeof setInterval> | null = null;
 
-  async function fetchWorkflows() {
+  async function fetchWorkflows(): Promise<boolean> {
     try {
       const res = await fetch("/api/workflows");
       const data: WorkflowsData = await res.json();
       groups.value = data.groups;
       errors.value = data.errors;
       rateLimit.value = data.rateLimit;
-    } catch (err) {
-      console.error("Failed to fetch workflows:", err);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -73,7 +74,11 @@ export function useWorkflows(pollIntervalMs = 30_000) {
 
   onMounted(async () => {
     loading.value = true;
-    await fetchWorkflows();
+    // Retry initial fetch — Express may still be starting (dev race condition)
+    for (let i = 0; i < 10; i++) {
+      if (await fetchWorkflows()) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
     loading.value = false;
     timer = setInterval(fetchWorkflows, pollIntervalMs);
   });
