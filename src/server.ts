@@ -16,9 +16,6 @@ export function createApp() {
     next();
   });
 
-  // Static files (legacy CSS — also served by Vue's public/ in dev)
-  app.use(express.static(join(__dirname, "public")));
-
   // Body parsing
   app.use(express.json());
 

@@ -10,7 +10,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "tsx watch src/cli.ts --no-open",
     "dev:client": "vite --config src/client/vite.config.ts --open",
-    "build:server": "tsup && printf '#!/usr/bin/env node\\n' | cat - dist/cli.js > dist/cli.tmp && mv dist/cli.tmp dist/cli.js && cp -r src/public dist/",
+    "build:server": "tsup && printf '#!/usr/bin/env node\\n' | cat - dist/cli.js > dist/cli.tmp && mv dist/cli.tmp dist/cli.js",
     "build:client": "vite build --config src/client/vite.config.ts",
     "build": "npm run build:server && npm run build:client",
     "test": "vitest run",

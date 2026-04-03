@@ -4,9 +4,16 @@ Local web dashboard for GitHub Actions. See workflow status across all your repo
 
 **Only prerequisite:** an authenticated [`gh` CLI](https://cli.github.com/).
 
-```
+```bash
 npx gha-dash
 ```
+
+Opens `http://localhost:3131` in your browser. All settings are configurable from the UI.
+
+| Flag | Description |
+|------|-------------|
+| `--port N`, `-p N` | Use a different port (default: 3131) |
+| `--no-open` | Don't auto-open browser |
 
 ## What it does
 
@@ -21,14 +28,6 @@ npx gha-dash
 ## Screenshot
 
 ![gha-dash screenshot](docs/screenshot.jpg)
-
-## CLI options
-
-```
-npx gha-dash              # start on default port (3131)
-npx gha-dash --port 8080  # custom port
-npx gha-dash --no-open    # don't auto-open browser
-```
 
 ## Configuration
 
@@ -60,10 +59,14 @@ gha-dash caches aggressively to stay within GitHub's 5,000 requests/hour limit:
 git clone https://github.com/photostructure/gha-dash
 cd gha-dash
 npm install
-npm run dev       # Express + Vite dev servers
+npm run dev       # starts Express (API on :3131) + Vite (UI on :5173)
 npm test          # vitest
-npm run build     # production build
+npm run build     # production build → dist/
 ```
+
+`npm run dev` opens `http://localhost:5173` automatically. The Vite dev
+server proxies API requests to Express on port 3131. In production
+(`npx gha-dash`), everything is served from a single port.
 
 ## Acknowledgments
 
