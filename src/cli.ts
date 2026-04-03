@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { exec } from "node:child_process";
 import { createApp } from "./server.js";
 import {
@@ -6,13 +9,42 @@ import {
   stopBackgroundRefresh,
 } from "./state.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function getVersion(): string {
+  // In production (dist/), package.json is one level up
+  for (const dir of [__dirname, join(__dirname, "..")]) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
+      return pkg.version;
+    } catch {
+      // try next
+    }
+  }
+  return "unknown";
+}
+
 function parseArgs(): { port?: number; open: boolean } {
   const args = process.argv.slice(2);
   let port: number | undefined;
   let open = true;
 
   for (let i = 0; i < args.length; i++) {
-    if ((args[i] === "--port" || args[i] === "-p") && args[i + 1]) {
+    if (args[i] === "--help" || args[i] === "-h") {
+      console.log(`gha-dash v${getVersion()} — GitHub Actions dashboard
+
+Usage: gha-dash [options]
+
+Options:
+  -p, --port N   Server port (default: 3131, configurable in settings)
+      --no-open  Don't auto-open browser
+  -h, --help     Show this help
+  -v, --version  Show version`);
+      process.exit(0);
+    } else if (args[i] === "--version" || args[i] === "-v") {
+      console.log(getVersion());
+      process.exit(0);
+    } else if ((args[i] === "--port" || args[i] === "-p") && args[i + 1]) {
       port = parseInt(args[i + 1], 10);
       i++;
     } else if (args[i] === "--no-open") {
