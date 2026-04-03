@@ -4,7 +4,7 @@
   "description": "GitHub Actions dashboard — workflow status across multiple orgs/accounts",
   "type": "module",
   "bin": {
-    "gha-dash": "./dist/cli.js"
+    "gha-dash": "dist/cli.js"
   },
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
@@ -28,6 +28,10 @@
   "files": [
     "dist/"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/photostructure/gha-dash.git"
+  },
   "license": "Apache-2.0",
   "engines": {
     "node": ">=20"
