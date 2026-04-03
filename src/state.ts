@@ -4,6 +4,7 @@ import { Cache } from "./services/cache.js";
 import {
   createOctokit,
   extractToken,
+  fetchActiveWorkflowIds,
   fetchAllRuns,
   fetchDefaultBranch,
   fetchRateLimit,
@@ -224,20 +225,17 @@ export async function refreshRepo(fullName: string): Promise<void> {
   if (!state) return;
 
   const [owner, repo] = fullName.split("/");
-  let branch = state.config.branches[fullName];
-  if (!branch) {
-    branch = await fetchDefaultBranch(state.octokit, owner, repo);
+
+  // Cache default branch for dispatch if not already cached
+  if (!state.config.branches[fullName]) {
+    const branch = await fetchDefaultBranch(state.octokit, owner, repo);
     state.config.branches[fullName] = branch;
     await writeConfig(state.config);
   }
 
   try {
-    const runs = await fetchWorkflowRuns(
-      state.octokit,
-      owner,
-      repo,
-      branch,
-    );
+    const activeIds = await fetchActiveWorkflowIds(state.octokit, owner, repo);
+    const runs = await fetchWorkflowRuns(state.octokit, owner, repo, activeIds);
 
     if (runs.length > 0) {
       state.cache.set(fullName, runs);

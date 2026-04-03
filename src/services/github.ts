@@ -78,27 +78,52 @@ export async function fetchDefaultBranch(
   return data.default_branch;
 }
 
+/**
+ * Fetch the set of workflow IDs that currently exist in the repo.
+ * Used to filter out runs for deleted workflow files.
+ */
+export async function fetchActiveWorkflowIds(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+): Promise<Set<number>> {
+  const workflows = await octokit.paginate(
+    octokit.actions.listRepoWorkflows,
+    { owner, repo, per_page: 100 },
+  );
+  return new Set(
+    workflows
+      .filter((w) => w.state === "active")
+      .map((w) => w.id),
+  );
+}
+
+/**
+ * Fetch workflow runs for a repo. No branch filter — returns the latest run
+ * per workflow across all branches. If activeWorkflowIds is provided, filters
+ * out runs for deleted/disabled workflows.
+ */
 export async function fetchWorkflowRuns(
   octokit: Octokit,
   owner: string,
   repo: string,
-  branch: string,
+  activeWorkflowIds?: Set<number>,
 ): Promise<WorkflowRun[]> {
   const { data } = await octokit.actions.listWorkflowRunsForRepo({
     owner,
     repo,
-    branch,
     per_page: 100,
   });
 
-  // Deduplicate by (workflow_id, branch) — keep the most recent run
-  // No lookback filter: we always show the latest run per workflow,
-  // even if it's old. This prevents repos from disappearing.
-  const seen = new Map<string, WorkflowRun>();
+  // Deduplicate by workflow_id — keep the most recent run per workflow.
+  // Runs are sorted newest-first by the API.
+  const seen = new Map<number, WorkflowRun>();
 
   for (const run of data.workflow_runs) {
-    const key = `${run.workflow_id}:${run.head_branch}`;
-    if (seen.has(key)) continue; // runs are sorted newest-first
+    // Skip deleted/disabled workflows
+    if (activeWorkflowIds && !activeWorkflowIds.has(run.workflow_id)) continue;
+
+    if (seen.has(run.workflow_id)) continue;
 
     const duration =
       run.status === "completed" && run.updated_at
@@ -112,13 +137,13 @@ export async function fetchWorkflowRuns(
     const fileName = path.split("/").pop()?.replace(/\.(yml|yaml)$/, "") ?? "";
     const workflowName = fileName || (run.name ?? `Workflow ${run.workflow_id}`);
 
-    seen.set(key, {
+    seen.set(run.workflow_id, {
       workflowId: run.workflow_id,
       workflowName,
       repo: `${owner}/${repo}`,
       status: run.status as WorkflowRun["status"],
       conclusion: (run.conclusion as WorkflowRun["conclusion"]) ?? null,
-      branch: run.head_branch ?? branch,
+      branch: run.head_branch ?? "unknown",
       commitSha: run.head_sha.slice(0, 7),
       commitMessage: run.display_title ?? "",
       duration,
@@ -140,7 +165,8 @@ export interface FetchResult {
 
 /**
  * Fetch runs for repos in parallel, capped at API_CONCURRENCY.
- * Uses cached branches to avoid per-repo GET /repos/{o}/{r} calls.
+ * Each repo costs 2 API calls: one for active workflows, one for runs.
+ * Default branch is also fetched if not cached (for dispatch).
  * If maxRepos is set, only fetches that many repos (for budget throttling).
  */
 export async function fetchAllRuns(
@@ -170,19 +196,14 @@ export async function fetchAllRuns(
       limit(async () => {
         const [owner, repo] = fullName.split("/");
         try {
-          // Use cached branch if available, otherwise fetch (1 API call)
-          let branch = cachedBranches[fullName];
-          if (!branch) {
-            branch = await fetchDefaultBranch(octokit, owner, repo);
+          // Cache default branch for dispatch (not needed for runs anymore)
+          if (!cachedBranches[fullName]) {
+            const branch = await fetchDefaultBranch(octokit, owner, repo);
             discoveredBranches[fullName] = branch;
           }
 
-          const result = await fetchWorkflowRuns(
-            octokit,
-            owner,
-            repo,
-            branch,
-          );
+          const activeIds = await fetchActiveWorkflowIds(octokit, owner, repo);
+          const result = await fetchWorkflowRuns(octokit, owner, repo, activeIds);
           runs.set(fullName, result);
         } catch (err) {
           errors.set(fullName, (err as Error).message);

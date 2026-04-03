@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { Octokit } from "@octokit/rest";
-import { fetchWorkflowRuns, fetchDefaultBranch } from "../github.js";
+import { fetchWorkflowRuns, fetchDefaultBranch, fetchActiveWorkflowIds } from "../github.js";
 
 const server = setupServer();
 
@@ -68,7 +68,7 @@ describe("fetchWorkflowRuns", () => {
     };
   }
 
-  it("deduplicates runs by (workflow_id, branch)", async () => {
+  it("deduplicates runs by workflow_id (latest run per workflow)", async () => {
     server.use(
       http.get(
         "https://api.github.com/repos/owner/repo/actions/runs",
@@ -76,26 +76,46 @@ describe("fetchWorkflowRuns", () => {
           return HttpResponse.json({
             total_count: 3,
             workflow_runs: [
-              // Two runs for same workflow+branch — only newest should be kept
+              // Two runs for same workflow — only newest should be kept
               makeRun(3, 100, "main", now),
-              makeRun(2, 100, "main", oneHourAgo),
-              // Different branch — should be kept
-              makeRun(1, 100, "feature", oneHourAgo),
+              makeRun(2, 100, "feature", oneHourAgo),
+              // Different workflow — should be kept
+              makeRun(1, 200, "main", oneHourAgo),
             ],
           });
         },
       ),
     );
 
-    const runs = await fetchWorkflowRuns(
-      makeOctokit(),
-      "owner",
-      "repo",
-      "main",
-    );
+    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
 
     expect(runs).toHaveLength(2);
-    expect(runs.map((r) => r.branch).sort()).toEqual(["feature", "main"]);
+    expect(runs.map((r) => r.workflowId).sort()).toEqual([100, 200]);
+    // Workflow 100: latest run is on main (run 3)
+    expect(runs.find((r) => r.workflowId === 100)?.branch).toBe("main");
+  });
+
+  it("filters out deleted workflows when activeWorkflowIds provided", async () => {
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/runs",
+        () => {
+          return HttpResponse.json({
+            total_count: 2,
+            workflow_runs: [
+              makeRun(2, 100, "main", now),
+              makeRun(1, 999, "main", oneHourAgo), // deleted workflow
+            ],
+          });
+        },
+      ),
+    );
+
+    const activeIds = new Set([100]); // 999 is deleted
+    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo", activeIds);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0].workflowId).toBe(100);
   });
 
   it("keeps old runs (no lookback filter — latest per workflow)", async () => {
@@ -114,12 +134,7 @@ describe("fetchWorkflowRuns", () => {
       ),
     );
 
-    const runs = await fetchWorkflowRuns(
-      makeOctokit(),
-      "owner",
-      "repo",
-      "main",
-    );
+    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
 
     // Both kept — different workflow_ids, each is the latest for its workflow
     expect(runs).toHaveLength(2);
@@ -146,13 +161,32 @@ describe("fetchWorkflowRuns", () => {
       ),
     );
 
-    const runs = await fetchWorkflowRuns(
-      makeOctokit(),
-      "owner",
-      "repo",
-      "main",
-    );
+    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
 
     expect(runs[0].duration).toBe(300_000); // 5 minutes in ms
+  });
+});
+
+describe("fetchActiveWorkflowIds", () => {
+  it("returns only active workflow IDs", async () => {
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/workflows",
+        () => {
+          return HttpResponse.json({
+            total_count: 3,
+            workflows: [
+              { id: 100, name: "CI", path: ".github/workflows/ci.yml", state: "active" },
+              { id: 200, name: "Deploy", path: ".github/workflows/deploy.yml", state: "active" },
+              { id: 300, name: "Old Security", path: ".github/workflows/security.yml", state: "deleted" },
+            ],
+          });
+        },
+      ),
+    );
+
+    const ids = await fetchActiveWorkflowIds(makeOctokit(), "owner", "repo");
+    expect(ids).toEqual(new Set([100, 200]));
+    expect(ids.has(300)).toBe(false);
   });
 });
