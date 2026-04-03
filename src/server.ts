@@ -1,9 +1,8 @@
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import express from "express";
-import { dashboardRoutes } from "./routes/dashboard.js";
-import { settingsRoutes } from "./routes/settings.js";
-import { dispatchRoutes } from "./routes/dispatch.js";
+import { apiRoutes } from "./routes/api.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -17,20 +16,24 @@ export function createApp() {
     next();
   });
 
-  // EJS setup
-  app.set("view engine", "ejs");
-  app.set("views", join(__dirname, "views"));
-
-  // Static files
+  // Static files (legacy CSS — also served by Vue's public/ in dev)
   app.use(express.static(join(__dirname, "public")));
 
-  // Body parsing for settings form
-  app.use(express.urlencoded({ extended: true }));
+  // Body parsing
+  app.use(express.json());
 
-  // Routes
-  app.use("/", dashboardRoutes());
-  app.use("/", settingsRoutes());
-  app.use("/", dispatchRoutes());
+  // API routes
+  app.use("/api", apiRoutes());
+
+  // Vue SPA — serve built client assets and fallback to index.html
+  const clientDir = join(__dirname, "client");
+  if (existsSync(clientDir)) {
+    app.use(express.static(clientDir));
+    app.get("/{*path}", (req, res, next) => {
+      if (req.path.startsWith("/api/")) return next();
+      res.sendFile(join(clientDir, "index.html"));
+    });
+  }
 
   return app;
 }

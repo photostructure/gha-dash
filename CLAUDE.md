@@ -12,51 +12,65 @@ Licensed under Apache 2.0.
 
 ```bash
 npm install
-npm run dev       # tsx watch — auto-restarts on changes
-npm test          # vitest (58 tests)
-npm run build     # tsup → dist/ (includes views + static assets)
+npm run dev:all   # Express (tsx watch) + Vite dev server
+npm test          # vitest (56 tests)
+npm run build     # tsup (server) + vite (client) → dist/
 ```
 
-The server binds to `127.0.0.1:3131` and auto-opens a browser.
+Dev: open `http://localhost:5173` (Vite proxies API to Express on :3131).
+Production: `node dist/cli.js` serves Vue SPA + API on :3131.
 
 ## Tech Stack
 
 - **Runtime**: Node.js 20+, TypeScript (strict, ESM — `"type": "module"`)
-- **Server**: Express 4, EJS templates, HTMX 2.x (vendored, no CDN)
+- **Server**: Express 5, JSON API routes
+- **Frontend**: Vue 3 (Composition API, `<script setup>`), vue-router, Vite
 - **GitHub API**: @octokit/rest, auth via `gh auth token`
 - **Tests**: vitest + msw (network-level API mocking) + supertest (routes)
-- **Build**: tsup → `dist/cli.js` with shebang for `npx gha-dash`
+- **Build**: tsup (server) + Vite (client) → `dist/`
 
 ## Project Structure
 
 ```
 src/
   cli.ts                  — Entry point (--port, --no-open, graceful shutdown)
-  server.ts               — Express app, security headers, static files
+  server.ts               — Express app, security headers, API routes, SPA serving
   state.ts                — App state, background refresh, rate limit logic
   types.ts                — Core types (AppConfig, WorkflowRun, helpers)
   routes/
-    dashboard.ts          — GET /, /partials/workflows, /refresh
-    settings.ts           — GET /settings, POST /settings/repos
-    dispatch.ts           — GET/POST /dispatch/:owner/:repo/:id
+    api.ts                — All JSON API endpoints (/api/*)
   services/
     github.ts             — Token extraction, Octokit, all API calls
     cache.ts              — Generic stale-while-revalidate cache with disk persistence
     config.ts             — XDG/APPDATA config read/write, cache persistence
     dispatch.ts           — Workflow YAML fetch/parse, dispatch API
+    workflows.ts          — groupRunsByRepo, RepoGroup type
     __tests__/            — All test files (colocated)
-  views/
-    head.ejs, foot.ejs    — Shared HTML head/foot
-    dashboard.ejs         — Main dashboard (table, search, sort, filter, JS)
-    settings.ejs          — Repo selection table
-    partials/
-      workflow-table.ejs  — Repo groups + workflow rows (HTMX target)
-      dispatch-form.ejs   — Typed input form for workflow dispatch
-      dispatch-result.ejs — Success/error feedback
-      error-banner.ejs    — Collapsed error display with dismiss
+  client/
+    index.html            — Vite entry point
+    main.ts               — Vue app creation + router
+    App.vue               — Root component (header + router-view)
+    router.ts             — / → Dashboard, /settings → Settings
+    vite.config.ts        — Vite build config + dev proxy
+    composables/
+      useWorkflows.ts     — Fetch/poll workflows, refresh
+      useConfig.ts        — Fetch/save configuration
+      useDispatch.ts      — Load dispatch info, trigger dispatch
+    views/
+      DashboardView.vue   — Error banner + workflow table
+      SettingsView.vue    — Repo selection + general config form
+    components/
+      AppHeader.vue       — Nav, rate limit badge, refresh button
+      WorkflowTable.vue   — Sortable/filterable grouped table
+      RepoGroup.vue       — Collapsible repo header + rows
+      WorkflowRow.vue     — Single run row + inline dispatch
+      DispatchForm.vue    — Typed inputs, submit, feedback
+      SearchToolbar.vue   — Search, failures-only, expand/collapse
+      StatusBadge.vue     — Color-coded status pill
+      ErrorBanner.vue     — Grouped error display
+      RateLimitBadge.vue  — Color-coded remaining/limit
   public/
     style.css             — All CSS (dark mode, responsive)
-    htmx.min.js           — Vendored HTMX 2.x
 ```
 
 ## Architecture
@@ -65,12 +79,15 @@ See `docs/ARCHITECTURE.md` for the full reference (types, routes, security,
 lore). Key points:
 
 - **Auth**: `gh auth token` extracts OAuth token at startup. Re-extracted on 401.
-- **Data flow**: Background poll fetches runs for all configured repos. HTMX
-  polls `/partials/workflows` every 30s. Cache is stale-while-revalidate.
+- **Data flow**: Server background-polls GitHub, caches runs. Vue client polls
+  `GET /api/workflows` every 30s. Reactive state means polls never destroy
+  collapse/sort/filter state.
 - **Config**: `~/.config/gha-dash/config.json` stores selected repos, available
   repos, cached branch names, and rate limit settings.
 - **Disk cache**: `~/.config/gha-dash/cache.json` — restarts don't refetch.
 - **Security**: localhost-only, token never exposed to browser, security headers.
+- **Dev**: `npm run dev:all` runs Express (tsx watch) + Vite dev server concurrently.
+  Open `http://localhost:5173` for Vue (proxies API to :3131).
 
 ## Rate Limiting
 
@@ -111,9 +128,9 @@ npm run test:watch    # watch mode
 ```
 
 - **Unit tests**: types, config, cache (pure logic)
-- **API tests**: msw intercepts Octokit requests (github-api.test.ts)
+- **GitHub API tests**: msw intercepts Octokit requests (github-api.test.ts)
 - **Token tests**: mock `execSync` for gh CLI (github.test.ts)
-- **Route tests**: supertest against Express app (routes.test.ts)
+- **API route tests**: supertest against Express JSON API (routes.test.ts)
 - **YAML parsing**: all `on:` syntax variants for dispatch (dispatch.test.ts)
 - **State tests**: cache prune, delete, refresh-preserves-data (state.test.ts)
 
@@ -132,12 +149,14 @@ Config tests stub both `XDG_CONFIG_HOME` and `APPDATA` for cross-platform.
 - `run.name` in the GitHub API is unreliable (sometimes includes commit
   message). We derive workflow names from `run.path` instead (e.g.
   `.github/workflows/build.yml` → "build"). `display_title` is shown as tooltip.
-- EJS `include()` resolves relative to the `views/` directory, not the current
-  template file. Use `include('head')` not `include('../head')`.
-- The `tsup` build bundles TS but not EJS/CSS. The build script copies
-  `src/views` and `src/public` into `dist/` separately.
+- `src/types.ts` helpers (`displayStatus`, `formatDuration`, `relativeTime`) are
+  pure functions — imported by both server and Vue client. No Node.js deps.
+- Server build (tsup) bundles TS but not CSS. Build script copies `src/public`
+  into `dist/`. Client build (Vite) outputs to `dist/client/`.
 - Checkbox inputs absent from POST body = unchecked. Dispatch route explicitly
   sets boolean inputs to `"false"` when missing.
+- Express 5 uses path-to-regexp v8 — wildcard routes need `/{*path}` not `*`.
+- Vite config `root` is relative to CWD, not the config file — use `__dirname`.
 - `npm pack --dry-run` is useful to verify the tarball contents before publish.
 
 ## Design Principles

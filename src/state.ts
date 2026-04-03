@@ -22,6 +22,7 @@ export interface AppState {
 
 let state: AppState | null = null;
 let refreshing = false;
+let refreshPromise: Promise<void> | null = null;
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
 export function getAppState(): AppState {
@@ -61,8 +62,19 @@ export async function initAppState(): Promise<AppState> {
   return state;
 }
 
-export async function refreshRuns(): Promise<void> {
-  if (!state || refreshing) return;
+/**
+ * Refresh all repos. If a refresh is already in flight, returns the existing
+ * promise so callers can await its completion rather than silently no-op.
+ */
+export function refreshRuns(): Promise<void> {
+  if (!state) return Promise.resolve();
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = doRefresh().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+async function doRefresh(): Promise<void> {
+  if (!state) return;
   refreshing = true;
 
   try {

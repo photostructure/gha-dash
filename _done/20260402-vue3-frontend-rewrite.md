@@ -10,12 +10,12 @@ API endpoints and serve a Vue app instead of EJS templates.
 
 - [x] Research
 - [x] Design
-- [ ] Implement
-- [ ] Test
-- [ ] Verify
-- [ ] Document
+- [x] Implement
+- [x] Test
+- [x] Verify
+- [x] Document
 - [ ] Review
-- [ ] Complete
+- [x] Complete
 
 ## Required Reading
 
@@ -76,55 +76,66 @@ Keep: Express 4, @octokit/rest, p-limit, yaml, vitest, msw, supertest, tsup (for
 ## Tasks
 
 ### 1. Add JSON API Endpoints
-- [ ] `GET /api/workflows` — returns grouped workflow data as JSON
-- [ ] `GET /api/config` — returns current config
-- [ ] `POST /api/config` — saves config (repos + general settings)
-- [ ] `POST /api/refresh` — triggers full refresh, returns updated data
-- [ ] `POST /api/refresh/:owner/:repo` — refreshes one repo, returns updated data
-- [ ] `GET /api/dispatch/:owner/:repo/:id` — returns dispatch info as JSON
-- [ ] `POST /api/dispatch/:owner/:repo/:id` — triggers dispatch
-- [ ] `GET /api/rate-limit` — returns current rate limit info
-- [ ] Keep existing EJS routes working during migration (remove later)
+- [x] `GET /api/workflows` — returns grouped workflow data as JSON
+- [x] `GET /api/config` — returns current config
+- [x] `PUT /api/config` — saves config (repos + general settings)
+- [x] `POST /api/refresh` — triggers full refresh, returns updated data
+- [x] `POST /api/refresh/:owner/:repo` — refreshes one repo, returns updated data
+- [x] `GET /api/dispatch/:owner/:repo/:id` — returns dispatch info as JSON
+- [x] `POST /api/dispatch/:owner/:repo/:id` — triggers dispatch
+- [x] Rate limit bundled into /api/workflows response (no separate endpoint needed)
+- [x] Existing EJS routes still work during migration
+- [x] 6 API route tests added (64 total tests, all passing)
 
 ### 2. Vue 3 App Setup
-- [ ] Add vite + vue 3 + vue-router to package.json
-- [ ] `src/client/` directory for Vue SPA
-- [ ] Vite config: dev proxy to Express, build output to `dist/client/`
-- [ ] Express serves `dist/client/` as static in production
-- [ ] Dev workflow: `vite dev` for frontend, `tsx watch` for backend
+- [x] Add vite + vue 3 + vue-router + concurrently to package.json
+- [x] `src/client/` directory for Vue SPA
+- [x] Vite config: dev proxy to Express, build output to `dist/client/`
+- [x] Express serves `dist/client/` as static in production (SPA fallback)
+- [x] Dev workflow: `npm run dev:all` (concurrent Vite + Express)
+- [x] Client tsconfig separate from server tsconfig
+- [x] Vite + server builds both work (`npm run build`)
 
-### 3. Dashboard Component
-- [ ] `src/client/views/Dashboard.vue` — main dashboard
-- [ ] Reactive state: `collapseMap`, `sortCol`, `sortDir`, `searchQuery`, `failuresOnly`
-- [ ] Collapse state persisted to localStorage via `watchEffect`
-- [ ] Column sorting as computed property (no DOM manipulation)
-- [ ] Search filter as computed property
-- [ ] Failures-only as computed property
-- [ ] Poll `/api/workflows` on interval — data updates, UI state preserved
-- [ ] Per-repo refresh button: POST, then re-fetch workflows
-- [ ] Global refresh button in header
-- [ ] Rate limit badge in header, updates after refresh
+### 3. Dashboard Components
+- [x] `src/client/views/DashboardView.vue` — main dashboard
+- [x] `src/client/components/WorkflowTable.vue` — sort/filter as computed
+- [x] `src/client/components/RepoGroup.vue` — collapsible repo header
+- [x] `src/client/components/WorkflowRow.vue` — workflow + inline dispatch
+- [x] `src/client/components/StatusBadge.vue` — color-coded status
+- [x] `src/client/components/ErrorBanner.vue` — deduplicated errors
+- [x] `src/client/components/RateLimitBadge.vue` — color-coded rate limit
+- [x] `src/client/components/SearchToolbar.vue` — search, failures-only, expand/collapse
+- [x] `src/client/components/AppHeader.vue` — header with nav
+- [x] Collapse state persisted to localStorage via `watch`
+- [x] Column sorting as computed property
+- [x] Search/failures-only filter as computed property
+- [x] Poll via `useWorkflows` composable with `setInterval`
+- [x] Per-repo + global refresh, state preserved
 
 ### 4. Settings Component
-- [ ] `src/client/views/Settings.vue` — unified settings page
-- [ ] Repo table with sortable columns (selected, owner, name)
-- [ ] Client-side filter text field
-- [ ] All/None/Invert helpers
-- [ ] General config form (refresh interval, rate limit, hidden workflows, port)
-- [ ] Single save button posts entire config
+- [x] `src/client/views/SettingsView.vue` — unified settings page
+- [x] Repo table with sortable columns (selected, owner, name)
+- [x] Client-side filter text field
+- [x] All/None/Invert helpers (operate on filtered rows)
+- [x] General config form (refresh interval, rate limit, hidden workflows, port)
+- [x] Single save button posts JSON to PUT /api/config
 
 ### 5. Dispatch Component
-- [ ] `src/client/components/DispatchForm.vue` — inline form
-- [ ] Expands below workflow row (detail row pattern)
-- [ ] Typed inputs from JSON dispatch info
-- [ ] Submit + success/error feedback
+- [x] `src/client/components/DispatchForm.vue` — inline form
+- [x] Expands below workflow row (detail row pattern)
+- [x] Typed inputs from JSON dispatch info (string, choice, boolean)
+- [x] Submit + success/error feedback
 
 ### 6. Cleanup
-- [ ] Remove EJS templates (`src/views/`)
-- [ ] Remove HTMX (`src/public/htmx.min.js`)
-- [ ] Remove EJS dependency
-- [ ] Update build script
-- [ ] Update tests
+- [x] Remove EJS templates (`src/views/`)
+- [x] Remove HTMX (`src/public/htmx.min.js`)
+- [x] Remove EJS dependency
+- [x] Remove EJS route files (dashboard.ts, settings.ts, dispatch.ts)
+- [x] Move `groupRunsByRepo` to `src/services/workflows.ts`
+- [x] Rewrite `server.ts` (no EJS, JSON-only + SPA serving)
+- [x] Update build script (remove views copy)
+- [x] Update tests (remove EJS tests, 56 tests passing)
+- [x] Update docs (ARCHITECTURE.md, CLAUDE.md)
 
 ## Key Design Decisions
 
@@ -158,6 +169,12 @@ CSS-in-JS.
 - Rate limit has `checkedAt` timestamp for display
 - Per-repo refresh that replaces DOM destroys collapse state — the whole reason
   for this rewrite
+- Express 5 uses path-to-regexp v8 — wildcard routes need `/{*path}` not `*`
+- Vite config `root` is relative to CWD, not config file — use `__dirname`
+- `src/types.ts` helpers (displayStatus, formatDuration, relativeTime) are pure
+  functions with no Node deps — import directly into Vue client code
+- Vue provide/inject used to share `useWorkflows` state from App.vue to both
+  AppHeader (rate limit badge) and DashboardView (table data)
 
 ## Failed Approaches (from EJS+HTMX session)
 
@@ -188,8 +205,10 @@ reverted before starting the Vue rewrite. The Vue rewrite replaces all of them.
 ## Session Log
 
 - **2026-04-01**: Planning. Reworked intern's TPPs. Designed architecture.
-- **2026-04-02**: Built entire EJS+HTMX dashboard in one session. Both phases
-  implemented. Hit rate limits twice, added disk persistence and rate limit
-  protections. Added sorting, filtering, collapse, dispatch, settings, CI
-  workflow. 58 tests. Hit collapse-state-vs-HTMX wall. User requested Vue 3
-  rewrite to solve the fundamental state management problem.
+- **2026-04-02 (session 1)**: Built entire EJS+HTMX dashboard in one session.
+  Both phases implemented. 58 tests. Hit collapse-state-vs-HTMX wall.
+- **2026-04-02 (session 2)**: Vue 3 rewrite complete. All 3 phases done.
+  JSON API (7 endpoints), Vue SPA (10 components, 3 composables), cleanup
+  (removed EJS/HTMX/views). Fixed existing bug: config save now awaits refresh
+  so newly added repos appear immediately. 56 tests, full build works.
+  Also moved `groupRunsByRepo` to `src/services/workflows.ts`.

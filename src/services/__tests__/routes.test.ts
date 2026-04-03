@@ -23,6 +23,7 @@ cache.set("owner/repo", [mockRun]);
 
 const mockUpdateConfig = vi.fn();
 const mockRefreshRuns = vi.fn();
+const mockRefreshRepo = vi.fn();
 
 vi.mock("../../state.js", () => ({
   getAppState: () => ({
@@ -34,88 +35,75 @@ vi.mock("../../state.js", () => ({
   }),
   updateConfig: (...args: unknown[]) => mockUpdateConfig(...args),
   refreshRuns: (...args: unknown[]) => mockRefreshRuns(...args),
+  refreshRepo: (...args: unknown[]) => mockRefreshRepo(...args),
 }));
 
 // Must import createApp after the mock is set up
 const { createApp } = await import("../../server.js");
 
-describe("dashboard routes", () => {
-  let app: ReturnType<typeof createApp>;
-
-  beforeEach(() => {
-    app = createApp();
-  });
-
-  it("GET / returns HTML with the workflow table", async () => {
-    const res = await request(app).get("/");
-    expect(res.status).toBe(200);
-    expect(res.text).toContain("gha-dash");
-    expect(res.text).toContain("workflow-table");
-    expect(res.text).toContain("owner/repo");
-    expect(res.text).toContain("CI");
-  });
-
-  it("GET / includes rate limit in footer", async () => {
-    const res = await request(app).get("/");
-    expect(res.text).toContain("4999");
-    expect(res.text).toContain("5000");
-  });
-
-  it("GET / includes security headers", async () => {
-    const res = await request(app).get("/");
-    expect(res.headers["x-content-type-options"]).toBe("nosniff");
-    expect(res.headers["x-frame-options"]).toBe("DENY");
-  });
-
-  it("GET /partials/workflows returns table rows", async () => {
-    const res = await request(app).get("/partials/workflows");
-    expect(res.status).toBe(200);
-    expect(res.text).toContain("repo-header");
-    expect(res.text).toContain("owner/repo");
-    expect(res.text).toContain("status-success");
-    expect(res.text).toContain("abc1234");
-  });
-
-  it("GET /partials/workflows excludes repos with no runs", async () => {
-    const res = await request(app).get("/partials/workflows");
-    expect(res.text).not.toContain("Loading workflow data");
-  });
-});
-
-describe("settings routes", () => {
+describe("API routes", () => {
   let app: ReturnType<typeof createApp>;
 
   beforeEach(() => {
     mockUpdateConfig.mockReset();
     mockRefreshRuns.mockReset();
+    mockRefreshRepo.mockReset();
     app = createApp();
   });
 
-  it("GET /settings returns the settings page", async () => {
-    const res = await request(app).get("/settings");
+  it("GET /api/workflows returns grouped runs with rate limit", async () => {
+    const res = await request(app).get("/api/workflows");
     expect(res.status).toBe(200);
-    expect(res.text).toContain("Settings");
-    expect(res.text).toContain("settings-form");
+    expect(res.body.groups).toHaveLength(1);
+    expect(res.body.groups[0].repo).toBe("owner/repo");
+    expect(res.body.groups[0].runs).toHaveLength(1);
+    expect(res.body.groups[0].runs[0].workflowName).toBe("CI");
+    expect(res.body.rateLimit.remaining).toBe(4999);
+    expect(res.body.rateLimit.limit).toBe(5000);
+    expect(res.body.errors).toHaveLength(0);
   });
 
-  it("POST /settings/all saves config and redirects", async () => {
-    const res = await request(app)
-      .post("/settings/all")
-      .type("form")
-      .send("repos=owner/repo&repos=owner/repo2&refreshInterval=3600&rateLimitFloor=500&rateBudgetPct=50&port=3131&hiddenWorkflows=dependabot");
+  it("GET /api/config returns current config", async () => {
+    const res = await request(app).get("/api/config");
+    expect(res.status).toBe(200);
+    expect(res.body.repos).toEqual(["owner/repo"]);
+    expect(res.body.availableRepos).toEqual(["owner/repo", "owner/other"]);
+    expect(res.body.refreshInterval).toBe(60);
+  });
 
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe("/");
-    expect(mockUpdateConfig).toHaveBeenCalled();
+  it("PUT /api/config updates config and returns it", async () => {
+    const res = await request(app)
+      .put("/api/config")
+      .send({ repos: ["owner/repo", "owner/other"], refreshInterval: 120 });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repos: ["owner/repo", "owner/other"],
+        refreshInterval: 120,
+      }),
+    );
     expect(mockRefreshRuns).toHaveBeenCalled();
   });
 
-  it("POST /settings/all handles single repo", async () => {
-    await request(app)
-      .post("/settings/all")
-      .type("form")
-      .send("repos=owner/single&refreshInterval=3600&rateLimitFloor=500&rateBudgetPct=50&port=3131&hiddenWorkflows=");
+  it("POST /api/refresh triggers refresh and returns data", async () => {
+    const res = await request(app).post("/api/refresh");
+    expect(res.status).toBe(200);
+    expect(res.body.groups).toHaveLength(1);
+    expect(res.body.rateLimit).toBeDefined();
+    expect(mockRefreshRuns).toHaveBeenCalled();
+  });
 
-    expect(mockUpdateConfig).toHaveBeenCalled();
+  it("POST /api/refresh/:owner/:repo refreshes one repo", async () => {
+    const res = await request(app).post("/api/refresh/owner/repo");
+    expect(res.status).toBe(200);
+    expect(res.body.groups).toHaveLength(1);
+    expect(mockRefreshRepo).toHaveBeenCalledWith("owner/repo");
+  });
+
+  it("includes security headers", async () => {
+    const res = await request(app).get("/api/workflows");
+    expect(res.headers["x-content-type-options"]).toBe("nosniff");
+    expect(res.headers["x-frame-options"]).toBe("DENY");
   });
 });

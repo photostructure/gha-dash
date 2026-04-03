@@ -6,17 +6,19 @@ Shared context for all gha-dash TPPs. This is a reference doc, not a TPP.
 
 ```
 ┌──────────────────────────────────────────┐
-│  Browser (HTMX + custom CSS)             │
-│  - Auto-polls for status updates         │
+│  Browser (Vue 3 SPA)                     │
+│  - Reactive state (sort, filter, collapse)
+│  - Auto-polls JSON API for updates       │
 │  - Forms for workflow dispatch            │
-│  - Org/repo selector for configuration   │
+│  - Settings for repo/config management   │
 └──────────────┬───────────────────────────┘
-               │ HTTP (HTMX partials)
+               │ JSON API (/api/*)
 ┌──────────────▼───────────────────────────┐
 │  Express Server (TypeScript, ESM)        │
-│  - EJS templates for HTML + partials     │
+│  - JSON API routes                       │
 │  - In-memory cache (stale-while-revalidate)
 │  - Background polling for fresh data     │
+│  - Serves Vue SPA static assets          │
 └──────────────┬───────────────────────────┘
                │ REST API (via Octokit)
 ┌──────────────▼───────────────────────────┐
@@ -30,20 +32,21 @@ Shared context for all gha-dash TPPs. This is a reference doc, not a TPP.
 
 | Layer | Choice | Why |
 |-------|--------|-----|
-| Runtime | Node.js 24+ | Current LTS, full ESM support |
+| Runtime | Node.js 20+ | ESM support |
 | Language | TypeScript (strict, ESM) | `"type": "module"` in package.json |
-| Server | Express 4 | Mature, well-known |
-| Templates | EJS | Simple, JS-native, good for partials |
-| Interactivity | HTMX 2.x | Polling, partials, forms — no build step |
-| Styling | Custom CSS | Hand-written, no framework |
+| Server | Express 5 | Mature, well-known |
+| Frontend | Vue 3 (Composition API) | Reactive UI, component model |
+| Routing | vue-router | SPA navigation (dashboard, settings) |
+| Build (client) | Vite | Fast dev server + production bundling |
+| Styling | Custom CSS | Hand-written, CSS variables, dark mode |
 | GitHub API | @octokit/rest | Official SDK, pagination, rate limits |
-| Concurrency | p-limit | Cap parallel API calls (~10) when fetching many repos |
-| YAML parsing | yaml | For workflow_dispatch inputs (Phase 2) |
+| Concurrency | p-limit | Cap parallel API calls (~10) |
+| YAML parsing | yaml | For workflow_dispatch inputs |
 | Config | XDG/APPDATA + fs | No dependency — see Config section |
 | Test runner | vitest | Native ESM, fast, TS out of the box |
-| API mocking | msw 2.x | Network-level interception, works with Octokit |
+| API mocking | msw 2.x | Network-level interception |
 | Dev | tsx | Fast TS execution, watch mode |
-| Build | tsup | Simple bundling for npm publish |
+| Build (server) | tsup | Simple bundling for npm publish |
 
 ## Core Types
 
@@ -52,8 +55,12 @@ Shared context for all gha-dash TPPs. This is a reference doc, not a TPP.
 
 export interface AppConfig {
   repos: string[];          // "owner/repo" format; empty = show all
-  refreshInterval: number;  // seconds, default 60
-  lookbackDays: number;     // skip runs older than this, default 7
+  availableRepos: string[];
+  branches: Record<string, string>;
+  hiddenWorkflows: string[];
+  refreshInterval: number;  // seconds, default 3600
+  rateLimitFloor: number;
+  rateBudgetPct: number;
   port: number;             // default 3131
 }
 
@@ -65,9 +72,11 @@ export interface WorkflowRun {
   conclusion: RunConclusion | null;
   branch: string;
   commitSha: string;
-  duration: number;         // seconds
+  commitMessage: string;
+  duration: number;         // milliseconds
   createdAt: string;        // ISO 8601
   htmlUrl: string;
+  workflowPath: string;
 }
 
 export type RunStatus = "completed" | "in_progress" | "queued" | "waiting";
@@ -77,26 +86,43 @@ export type RunConclusion =
   | "cancelled"
   | "skipped"
   | "timed_out";
-
-export interface CacheEntry<T> {
-  data: T;
-  fetchedAt: number;        // Date.now()
-  error: string | null;     // last refresh error, if any
-}
 ```
 
-## Routes
+## API Routes
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/` | GET | Dashboard (full page) |
-| `/partials/workflows` | GET | HTMX partial: all workflow cards |
-| `/settings` | GET | Repo/org selector page |
-| `/partials/orgs` | GET | HTMX partial: available orgs |
-| `/partials/repos/:owner` | GET | HTMX partial: repos for an owner |
-| `/settings/repos` | POST | Save selected repos |
-| `/dispatch/:owner/:repo/:id` | GET | Dispatch form partial |
-| `/dispatch/:owner/:repo/:id` | POST | Trigger workflow dispatch |
+| `/api/workflows` | GET | Grouped workflow runs + errors + rate limit |
+| `/api/config` | GET | Current configuration |
+| `/api/config` | PUT | Update configuration, triggers refresh |
+| `/api/refresh` | POST | Refresh all repos, returns updated data |
+| `/api/refresh/:owner/:repo` | POST | Refresh single repo, returns updated data |
+| `/api/dispatch/:owner/:repo/:id` | GET | Dispatch form metadata (inputs, default branch) |
+| `/api/dispatch/:owner/:repo/:id` | POST | Trigger workflow dispatch |
+
+## Frontend Architecture
+
+Vue 3 SPA with Composition API (`<script setup lang="ts">`).
+
+### Composables
+- `useWorkflows` — fetch/poll groups, refresh all/single repo
+- `useConfig` — fetch/save app configuration
+- `useDispatch` — load dispatch info, trigger dispatch
+
+### Components
+- `AppHeader` — nav, rate limit badge, refresh button
+- `DashboardView` — error banner + workflow table
+- `WorkflowTable` — sort/filter as computed properties, collapse state
+- `RepoGroup` — collapsible repo header + workflow rows
+- `WorkflowRow` — single run + inline dispatch form
+- `SettingsView` — repo selection table + general config form
+- `DispatchForm` — typed inputs, submit, success/error feedback
+
+### Client-side state (reactive, not from API)
+- Collapse map — persisted to localStorage
+- Sort column/direction — computed sorting within repo groups
+- Search query, failures-only filter — computed filtering
+- Dispatch form visibility — per-workflow-row toggle
 
 ## Config: No `env-paths` Dependency
 
@@ -124,15 +150,15 @@ Config file: `{configDir}/config.json`. Create directory on first write.
 ## Accessibility
 
 - Semantic `<table>` with `<th scope="col">` headers for screen readers
-- Status badges use **color + icon/text** (not color alone)
-- `aria-label` on status badges: e.g. "Workflow CI: success"
+- Status badges use **color + text** (not color alone)
+- `aria-label` on status badges and action buttons
 - Repo group headers use `aria-expanded` to indicate collapse state
-- `aria-live="polite"` on the `<tbody>` for HTMX row updates
-- All forms use standard HTML elements (keyboard-navigable by default)
+- Keyboard navigable: repo headers focusable, Enter/Space to toggle
+- Form labels associated with inputs, `aria-required` on required fields
 
 ## Lore
 
-Consolidated from all planning sessions. Non-obvious details and gotchas:
+Consolidated from all planning and implementation sessions:
 
 - `gh auth token` prints token to stdout with a trailing newline — use
   `execSync("gh auth token", { encoding: "utf-8" }).trim()`
@@ -143,23 +169,17 @@ Consolidated from all planning sessions. Non-obvious details and gotchas:
 - `GET /user/orgs` returns orgs but NOT the user's personal account — also
   fetch `/user` to get the username for personal repos
 - Octokit handles 429 rate-limit retries automatically
-- One `runs` call per repo per refresh — with 50 repos at 60s: ~50 calls/min,
-  well within 5000/hr limit
-- HTMX can be vendored as a single .js file (~14KB gzipped) — no CDN needed
-- EJS partials: `<%- include('partials/card', { data }) %>`
-- `tsx` supports `--watch` for auto-restart during development
+- `run.name` is unreliable — derive workflow name from `run.path` filename
 - Contents API returns base64 `content` — decode with
   `Buffer.from(content, "base64").toString()`
 - Workflow YAML `on` key can be a string, array, or object — handle all forms
-- Dispatch API (`POST .../dispatches`) returns 204 No Content — no run ID.
-  Link to the workflow's runs page on GitHub instead.
+- Dispatch API (`POST .../dispatches`) returns 204 No Content — no run ID
 - Input values in dispatch are always strings, even for booleans (`"true"/"false"`)
-- Deduplicate runs by `(workflow_id, branch)` not just `workflow_id` — this shows
-  the latest run per branch per workflow, which is more useful for branch-based CI
-- Use `p-limit` (tiny dependency) to cap concurrent API calls at ~10 when fetching
-  runs for many repos in parallel — prevents hammering the API
-- Format durations with smart unit selection: show `"2m 30s"` not `"0h 2m 30s"`.
-  Pick format based on magnitude (>1h → `Hh Mm Ss`, >1m → `Mm Ss`, else → `Ss`)
-- Guard background refresh with a `_refreshing` flag to prevent overlapping poll
-  cycles — the fetch can take longer than the poll interval with many repos
-- `lookbackDays` config (default 7) filters out old runs, keeping the table focused
+- Checkbox inputs absent from POST body = unchecked
+- Use `p-limit` to cap concurrent API calls at ~10
+- Format durations with smart unit selection: `"2m 30s"` not `"0h 2m 30s"`
+- Guard background refresh with a promise to prevent overlapping poll cycles
+- Express 5 uses path-to-regexp v8 — wildcard routes need `/{*path}` not `*`
+- `src/types.ts` helpers (displayStatus, formatDuration, relativeTime) are pure
+  functions — imported by both server and Vue client
+- Vite config `root` is relative to CWD, not the config file — use `__dirname`

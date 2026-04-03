@@ -1,0 +1,95 @@
+import { ref, onMounted, onUnmounted } from "vue";
+import type { WorkflowRun } from "../../types.js";
+
+export interface RepoGroup {
+  repo: string;
+  runs: WorkflowRun[];
+  error: string | null;
+}
+
+export interface RateLimitInfo {
+  remaining: number;
+  limit: number;
+  checkedAt: string;
+}
+
+export interface WorkflowsData {
+  groups: RepoGroup[];
+  errors: { repo: string; message: string }[];
+  rateLimit: RateLimitInfo | null;
+}
+
+export function useWorkflows(pollIntervalMs = 30_000) {
+  const groups = ref<RepoGroup[]>([]);
+  const errors = ref<{ repo: string; message: string }[]>([]);
+  const rateLimit = ref<RateLimitInfo | null>(null);
+  const loading = ref(false);
+  const refreshing = ref(false);
+  const refreshingRepo = ref<string | null>(null);
+
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  async function fetchWorkflows() {
+    try {
+      const res = await fetch("/api/workflows");
+      const data: WorkflowsData = await res.json();
+      groups.value = data.groups;
+      errors.value = data.errors;
+      rateLimit.value = data.rateLimit;
+    } catch (err) {
+      console.error("Failed to fetch workflows:", err);
+    }
+  }
+
+  async function refreshAll() {
+    refreshing.value = true;
+    try {
+      const res = await fetch("/api/refresh", { method: "POST" });
+      const data: WorkflowsData = await res.json();
+      groups.value = data.groups;
+      errors.value = data.errors;
+      rateLimit.value = data.rateLimit;
+    } catch (err) {
+      console.error("Failed to refresh:", err);
+    } finally {
+      refreshing.value = false;
+    }
+  }
+
+  async function refreshRepo(fullName: string) {
+    refreshingRepo.value = fullName;
+    try {
+      const res = await fetch(`/api/refresh/${fullName}`, { method: "POST" });
+      const data: WorkflowsData = await res.json();
+      groups.value = data.groups;
+      errors.value = data.errors;
+      rateLimit.value = data.rateLimit;
+    } catch (err) {
+      console.error(`Failed to refresh ${fullName}:`, err);
+    } finally {
+      refreshingRepo.value = null;
+    }
+  }
+
+  onMounted(async () => {
+    loading.value = true;
+    await fetchWorkflows();
+    loading.value = false;
+    timer = setInterval(fetchWorkflows, pollIntervalMs);
+  });
+
+  onUnmounted(() => {
+    if (timer) clearInterval(timer);
+  });
+
+  return {
+    groups,
+    errors,
+    rateLimit,
+    loading,
+    refreshing,
+    refreshingRepo,
+    refreshAll,
+    refreshRepo,
+  };
+}

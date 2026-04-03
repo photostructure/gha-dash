@@ -1,0 +1,46 @@
+<script setup lang="ts">
+import { ref } from "vue";
+import type { WorkflowRun } from "../../types.js";
+import { formatDuration, relativeTime } from "../../types.js";
+import StatusBadge from "./StatusBadge.vue";
+import DispatchForm from "./DispatchForm.vue";
+
+defineProps<{ run: WorkflowRun }>();
+
+const showDispatch = ref(false);
+
+function workflowUrl(run: WorkflowRun): string {
+  const file = run.workflowPath.split("/").pop();
+  return `https://github.com/${run.repo}/actions/workflows/${file}`;
+}
+</script>
+
+<template>
+  <tr :data-repo="run.repo">
+    <td>
+      <a :href="workflowUrl(run)" target="_blank" rel="noopener">{{ run.workflowName }}</a>
+    </td>
+    <td><code>{{ run.branch }}</code></td>
+    <td><StatusBadge :run="run" /></td>
+    <td><code>{{ run.commitSha }}</code></td>
+    <td class="message-col">
+      <a :href="run.htmlUrl" target="_blank" rel="noopener">{{ run.commitMessage }}</a>
+    </td>
+    <td :title="new Date(run.createdAt).toLocaleString()">{{ relativeTime(run.createdAt) }}</td>
+    <td>{{ formatDuration(run.duration) }}</td>
+    <td class="actions-col">
+      <button
+        type="button"
+        class="btn-dispatch"
+        :title="showDispatch ? 'Close dispatch' : 'Run workflow'"
+        :aria-label="`Run ${run.workflowName}`"
+        @click="showDispatch = !showDispatch"
+      >&#x25B6;</button>
+    </td>
+  </tr>
+  <tr v-if="showDispatch" class="dispatch-row" :data-repo="run.repo">
+    <td colspan="8">
+      <DispatchForm :run="run" @close="showDispatch = false" />
+    </td>
+  </tr>
+</template>
