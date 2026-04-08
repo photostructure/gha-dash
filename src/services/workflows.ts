@@ -1,10 +1,12 @@
 import type { WorkflowRun, CacheEntry } from "../types.js";
 import type { AppState } from "../state.js";
+import type { RepoStats } from "./github.js";
 
 export interface RepoGroup {
   repo: string;
   runs: WorkflowRun[];
   error: string | null;
+  stats: RepoStats | null;
 }
 
 export function groupRunsByRepo(state: AppState): RepoGroup[] {
@@ -26,7 +28,7 @@ export function groupRunsByRepo(state: AppState): RepoGroup[] {
     // Skip repo entirely if all its runs were hidden
     if (runs.length === 0 && !typed.error) continue;
 
-    groups.push({ repo, runs, error: typed.error });
+    groups.push({ repo, runs, error: typed.error, stats: state.repoStats.get(repo) ?? null });
   }
 
   groups.sort((a, b) => a.repo.localeCompare(b.repo));

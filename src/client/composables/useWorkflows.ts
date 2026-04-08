@@ -1,10 +1,17 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import type { WorkflowRun } from "../../types.js";
 
+export interface RepoStats {
+  openPrs: number;
+  openIssues: number;
+  canPush: boolean;
+}
+
 export interface RepoGroup {
   repo: string;
   runs: WorkflowRun[];
   error: string | null;
+  stats: RepoStats | null;
 }
 
 export interface RateLimitInfo {

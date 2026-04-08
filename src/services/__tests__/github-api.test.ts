@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { Octokit } from "@octokit/rest";
-import { fetchWorkflowRuns, fetchDefaultBranch, fetchActiveWorkflowIds } from "../github.js";
+import { fetchWorkflowRuns, fetchRepoMeta, fetchActiveWorkflowIds } from "../github.js";
 
 const server = setupServer();
 
@@ -17,13 +17,13 @@ function makeOctokit(): Octokit {
   });
 }
 
-describe("fetchDefaultBranch", () => {
-  it("returns the default branch from repo metadata", async () => {
+describe("fetchRepoMeta", () => {
+  it("returns default branch and open issues count", async () => {
     server.use(
       http.get("https://api.github.com/repos/owner/repo", () => {
         return HttpResponse.json({
           default_branch: "develop",
-          // Octokit expects full repo shape but we only need default_branch
+          open_issues_count: 7,
           id: 1,
           name: "repo",
           full_name: "owner/repo",
@@ -32,8 +32,9 @@ describe("fetchDefaultBranch", () => {
       }),
     );
 
-    const branch = await fetchDefaultBranch(makeOctokit(), "owner", "repo");
-    expect(branch).toBe("develop");
+    const meta = await fetchRepoMeta(makeOctokit(), "owner", "repo");
+    expect(meta.defaultBranch).toBe("develop");
+    expect(meta.openIssuesAndPrs).toBe(7);
   });
 });
 

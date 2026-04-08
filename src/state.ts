@@ -6,11 +6,13 @@ import {
   extractToken,
   fetchActiveWorkflowIds,
   fetchAllRuns,
-  fetchDefaultBranch,
+  fetchRepoMeta,
+  fetchRepoStats,
   fetchRateLimit,
   fetchUserRepos,
   fetchWorkflowRuns,
 } from "./services/github.js";
+import type { RepoStats } from "./services/github.js";
 import { readConfig, writeConfig } from "./services/config.js";
 
 export interface AppState {
@@ -18,6 +20,7 @@ export interface AppState {
   octokit: Octokit;
   username: string;
   cache: Cache<WorkflowRun[]>;
+  repoStats: Map<string, RepoStats>;
   rateLimit: { remaining: number; limit: number; checkedAt: Date } | null;
 }
 
@@ -57,6 +60,7 @@ export async function initAppState(): Promise<AppState> {
     octokit,
     username: user.login,
     cache,
+    repoStats: new Map(),
     rateLimit: null,
   };
 
@@ -115,7 +119,7 @@ async function doRefresh(): Promise<void> {
     // Calculate how many repos we can afford to refresh this cycle
     const maxRepos = computeBudget(state, repos.length);
 
-    const { runs, errors, discoveredBranches } = await fetchAllRuns(
+    const { runs, stats, errors, discoveredBranches } = await fetchAllRuns(
       state.octokit,
       repos,
       state.config.branches,
@@ -126,6 +130,10 @@ async function doRefresh(): Promise<void> {
       if (repoRuns.length > 0) {
         state.cache.set(repo, repoRuns);
       }
+    }
+
+    for (const [repo, repoStats] of stats) {
+      state.repoStats.set(repo, repoStats);
     }
 
     for (const [repo, message] of errors) {
@@ -226,15 +234,20 @@ export async function refreshRepo(fullName: string): Promise<void> {
 
   const [owner, repo] = fullName.split("/");
 
-  // Cache default branch for dispatch if not already cached
+  // Fetch repo metadata (branch + issue count)
+  const meta = await fetchRepoMeta(state.octokit, owner, repo);
   if (!state.config.branches[fullName]) {
-    const branch = await fetchDefaultBranch(state.octokit, owner, repo);
-    state.config.branches[fullName] = branch;
+    state.config.branches[fullName] = meta.defaultBranch;
     await writeConfig(state.config);
   }
 
   try {
-    const activeIds = await fetchActiveWorkflowIds(state.octokit, owner, repo);
+    const [activeIds, repoStats] = await Promise.all([
+      fetchActiveWorkflowIds(state.octokit, owner, repo),
+      fetchRepoStats(state.octokit, owner, repo, meta.openIssuesAndPrs, meta.canPush),
+    ]);
+    state.repoStats.set(fullName, repoStats);
+
     const runs = await fetchWorkflowRuns(state.octokit, owner, repo, activeIds);
 
     if (runs.length > 0) {

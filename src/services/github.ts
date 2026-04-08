@@ -69,13 +69,59 @@ export async function fetchOrgRepos(
   }));
 }
 
-export async function fetchDefaultBranch(
+export interface RepoMeta {
+  defaultBranch: string;
+  openIssuesAndPrs: number;
+  canPush: boolean;
+}
+
+export async function fetchRepoMeta(
   octokit: Octokit,
   owner: string,
   repo: string,
-): Promise<string> {
+): Promise<RepoMeta> {
   const { data } = await octokit.repos.get({ owner, repo });
-  return data.default_branch;
+  return {
+    defaultBranch: data.default_branch,
+    openIssuesAndPrs: data.open_issues_count,
+    canPush: data.permissions?.push ?? false,
+  };
+}
+
+export interface RepoStats {
+  openPrs: number;
+  openIssues: number;
+  canPush: boolean;
+}
+
+export async function fetchRepoStats(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  openIssuesAndPrs: number,
+  canPush: boolean,
+): Promise<RepoStats> {
+  // GitHub's open_issues_count includes PRs. Fetch open PR count
+  // with per_page=1 and read the Link header for the real total.
+  const resp = await octokit.pulls.list({
+    owner,
+    repo,
+    state: "open",
+    per_page: 1,
+  });
+
+  let openPrs = resp.data.length;
+  if (openPrs > 0) {
+    const link = (resp as unknown as { headers: Record<string, string> }).headers.link ?? "";
+    const lastMatch = link.match(/[&?]page=(\d+)[^>]*>;\s*rel="last"/);
+    if (lastMatch) openPrs = parseInt(lastMatch[1], 10);
+  }
+
+  return {
+    openPrs,
+    openIssues: Math.max(0, openIssuesAndPrs - openPrs),
+    canPush,
+  };
 }
 
 /**
@@ -158,6 +204,7 @@ export async function fetchWorkflowRuns(
 
 export interface FetchResult {
   runs: Map<string, WorkflowRun[]>;
+  stats: Map<string, RepoStats>;
   errors: Map<string, string>;
   /** Branches discovered during this fetch (to persist to config) */
   discoveredBranches: Record<string, string>;
@@ -177,6 +224,7 @@ export async function fetchAllRuns(
 ): Promise<FetchResult> {
   const limit = pLimit(API_CONCURRENCY);
   const runs = new Map<string, WorkflowRun[]>();
+  const stats = new Map<string, RepoStats>();
   const errors = new Map<string, string>();
   const discoveredBranches: Record<string, string> = {};
 
@@ -196,15 +244,19 @@ export async function fetchAllRuns(
       limit(async () => {
         const [owner, repo] = fullName.split("/");
         try {
-          // Cache default branch for dispatch (not needed for runs anymore)
+          const meta = await fetchRepoMeta(octokit, owner, repo);
           if (!cachedBranches[fullName]) {
-            const branch = await fetchDefaultBranch(octokit, owner, repo);
-            discoveredBranches[fullName] = branch;
+            discoveredBranches[fullName] = meta.defaultBranch;
           }
 
-          const activeIds = await fetchActiveWorkflowIds(octokit, owner, repo);
+          const [activeIds, repoStats] = await Promise.all([
+            fetchActiveWorkflowIds(octokit, owner, repo),
+            fetchRepoStats(octokit, owner, repo, meta.openIssuesAndPrs, meta.canPush),
+          ]);
+
           const result = await fetchWorkflowRuns(octokit, owner, repo, activeIds);
           runs.set(fullName, result);
+          stats.set(fullName, repoStats);
         } catch (err) {
           errors.set(fullName, (err as Error).message);
         }
@@ -212,7 +264,7 @@ export async function fetchAllRuns(
     ),
   );
 
-  return { runs, errors, discoveredBranches };
+  return { runs, stats, errors, discoveredBranches };
 }
 
 export async function fetchRateLimit(

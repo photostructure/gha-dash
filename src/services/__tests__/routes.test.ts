@@ -31,6 +31,7 @@ vi.mock("../../state.js", () => ({
     octokit: {},
     username: "testuser",
     cache,
+    repoStats: new Map([["owner/repo", { openPrs: 2, openIssues: 3, canPush: true }]]),
     rateLimit: { remaining: 4999, limit: 5000, checkedAt: new Date() },
   }),
   updateConfig: (...args: unknown[]) => mockUpdateConfig(...args),
