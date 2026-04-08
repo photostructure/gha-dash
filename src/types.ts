@@ -35,7 +35,7 @@ export interface WorkflowRun {
   workflowPath: string; // e.g. ".github/workflows/ci.yml"
 }
 
-export type RunStatus = "completed" | "in_progress" | "queued" | "waiting";
+export type RunStatus = "completed" | "in_progress" | "queued" | "waiting" | "pending";
 export type RunConclusion =
   | "success"
   | "failure"

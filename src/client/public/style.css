@@ -230,7 +230,7 @@ th.sort-desc::after { content: ' \25BC'; }
 
 .dot-success { background: var(--success); }
 .dot-failure { background: var(--failure); }
-.dot-in_progress, .dot-queued, .dot-waiting { background: var(--pending); }
+.dot-in_progress, .dot-queued, .dot-waiting, .dot-pending { background: var(--pending); }
 .dot-cancelled, .dot-skipped, .dot-timed_out { background: var(--neutral); }
 
 .btn-refresh {
@@ -273,7 +273,7 @@ th.sort-desc::after { content: ' \25BC'; }
 
 .status-success { background: var(--success-bg); color: var(--success); }
 .status-failure { background: var(--failure-bg); color: var(--failure); }
-.status-in_progress, .status-queued, .status-waiting {
+.status-in_progress, .status-queued, .status-waiting, .status-pending {
   background: var(--pending-bg); color: var(--pending);
 }
 .status-cancelled, .status-skipped, .status-timed_out {

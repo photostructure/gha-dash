@@ -58,4 +58,8 @@ describe("displayStatus", () => {
     expect(displayStatus(run("in_progress", null))).toBe("in_progress");
     expect(displayStatus(run("queued", null))).toBe("queued");
   });
+
+  it("shows status for pending runs", () => {
+    expect(displayStatus(run("pending", null))).toBe("pending");
+  });
 });

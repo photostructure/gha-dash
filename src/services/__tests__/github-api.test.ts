@@ -69,7 +69,7 @@ describe("fetchWorkflowRuns", () => {
     };
   }
 
-  it("deduplicates runs by workflow_id (latest run per workflow)", async () => {
+  it("deduplicates completed runs by workflow_id (keeps latest per workflow)", async () => {
     server.use(
       http.get(
         "https://api.github.com/repos/owner/repo/actions/runs",
@@ -139,6 +139,77 @@ describe("fetchWorkflowRuns", () => {
 
     // Both kept — different workflow_ids, each is the latest for its workflow
     expect(runs).toHaveLength(2);
+  });
+
+  it("keeps all active runs even for the same workflow", async () => {
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/runs",
+        () => {
+          return HttpResponse.json({
+            total_count: 4,
+            workflow_runs: [
+              makeRun(4, 100, "feature-b", now, { status: "in_progress", conclusion: null }),
+              makeRun(3, 100, "feature-a", oneHourAgo, { status: "queued", conclusion: null }),
+              makeRun(2, 100, "main", twoDaysAgo), // completed — kept (latest)
+              makeRun(1, 100, "main", tenDaysAgo), // completed — dropped (already have one)
+            ],
+          });
+        },
+      ),
+    );
+
+    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
+
+    expect(runs).toHaveLength(3);
+    expect(runs.map((r) => r.branch).sort()).toEqual(["feature-a", "feature-b", "main"]);
+  });
+
+  it("keeps runs with pending status", async () => {
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/runs",
+        () => {
+          return HttpResponse.json({
+            total_count: 2,
+            workflow_runs: [
+              makeRun(2, 100, "main", now, { status: "pending", conclusion: null }),
+              makeRun(1, 100, "main", oneHourAgo), // completed
+            ],
+          });
+        },
+      ),
+    );
+
+    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
+
+    expect(runs).toHaveLength(2);
+    expect(runs[0].status).toBe("pending");
+    expect(runs[1].status).toBe("completed");
+  });
+
+  it("keeps all active runs across multiple workflows plus latest completed", async () => {
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/runs",
+        () => {
+          return HttpResponse.json({
+            total_count: 5,
+            workflow_runs: [
+              makeRun(5, 100, "main", now, { status: "in_progress", conclusion: null }),
+              makeRun(4, 200, "main", now, { status: "waiting", conclusion: null }),
+              makeRun(3, 100, "main", oneHourAgo),    // completed — kept (latest for wf 100)
+              makeRun(2, 200, "main", oneHourAgo),    // completed — kept (latest for wf 200)
+              makeRun(1, 100, "develop", twoDaysAgo), // completed — dropped (wf 100 already has one)
+            ],
+          });
+        },
+      ),
+    );
+
+    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
+
+    expect(runs).toHaveLength(4);
   });
 
   it("computes duration for completed runs", async () => {

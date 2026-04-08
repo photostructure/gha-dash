@@ -145,9 +145,9 @@ export async function fetchActiveWorkflowIds(
 }
 
 /**
- * Fetch workflow runs for a repo. No branch filter — returns the latest run
- * per workflow across all branches. If activeWorkflowIds is provided, filters
- * out runs for deleted/disabled workflows.
+ * Fetch workflow runs for a repo. Returns all active runs (queued, in_progress,
+ * waiting, pending) plus the latest completed run per workflow. If
+ * activeWorkflowIds is provided, filters out runs for deleted/disabled workflows.
  */
 export async function fetchWorkflowRuns(
   octokit: Octokit,
@@ -161,15 +161,23 @@ export async function fetchWorkflowRuns(
     per_page: 100,
   });
 
-  // Deduplicate by workflow_id — keep the most recent run per workflow.
+  // Keep all active runs + latest completed run per workflow.
   // Runs are sorted newest-first by the API.
-  const seen = new Map<number, WorkflowRun>();
+  const ACTIVE_STATUSES = new Set(["queued", "in_progress", "waiting", "pending"]);
+  const results: WorkflowRun[] = [];
+  const seenCompleted = new Set<number>();
 
   for (const run of data.workflow_runs) {
     // Skip deleted/disabled workflows
     if (activeWorkflowIds && !activeWorkflowIds.has(run.workflow_id)) continue;
 
-    if (seen.has(run.workflow_id)) continue;
+    const isActive = ACTIVE_STATUSES.has(run.status ?? "");
+
+    // For completed runs, keep only the latest per workflow
+    if (!isActive) {
+      if (seenCompleted.has(run.workflow_id)) continue;
+      seenCompleted.add(run.workflow_id);
+    }
 
     const duration =
       run.status === "completed" && run.updated_at
@@ -183,7 +191,7 @@ export async function fetchWorkflowRuns(
     const fileName = path.split("/").pop()?.replace(/\.(yml|yaml)$/, "") ?? "";
     const workflowName = fileName || (run.name ?? `Workflow ${run.workflow_id}`);
 
-    seen.set(run.workflow_id, {
+    results.push({
       workflowId: run.workflow_id,
       workflowName,
       repo: `${owner}/${repo}`,
@@ -199,7 +207,7 @@ export async function fetchWorkflowRuns(
     });
   }
 
-  return [...seen.values()];
+  return results;
 }
 
 export interface FetchResult {

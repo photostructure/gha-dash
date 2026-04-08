@@ -41,7 +41,7 @@ function onKeydown(e: KeyboardEvent) {
         <span v-if="collapsed" class="status-dots">
           <span
             v-for="run in group.runs"
-            :key="run.workflowId"
+            :key="run.htmlUrl"
             class="status-dot"
             :class="`dot-${displayStatus(run)}`"
             :title="`${run.workflowName}: ${displayStatus(run)}`"
@@ -81,6 +81,6 @@ function onKeydown(e: KeyboardEvent) {
     </td>
   </tr>
   <template v-if="!collapsed">
-    <WorkflowRow v-for="run in group.runs" :key="`${run.workflowId}-${run.branch}`" :run="run" :can-push="group.stats?.canPush ?? false" />
+    <WorkflowRow v-for="run in group.runs" :key="run.htmlUrl" :run="run" :can-push="group.stats?.canPush ?? false" />
   </template>
 </template>
