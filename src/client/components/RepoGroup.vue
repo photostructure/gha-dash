@@ -38,7 +38,7 @@ function onKeydown(e: KeyboardEvent) {
         <span class="collapse-icon">{{ collapsed ? "\u25B6" : "\u25BC" }}</span>
         <strong>{{ group.repo }}</strong>
         <span v-if="group.error" class="error-badge" :title="group.error">&#x26A0; error</span>
-        <span v-if="collapsed" class="status-dots">
+        <span class="status-dots">
           <span
             v-for="run in group.runs"
             :key="run.htmlUrl"
