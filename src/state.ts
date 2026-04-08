@@ -15,6 +15,7 @@ import {
 } from "./services/github.js";
 import type { RepoStats } from "./services/github.js";
 import { readConfig, writeConfig } from "./services/config.js";
+import { computeNextRefresh, updateDurationHistory } from "./services/scheduler.js";
 
 export interface AppState {
   config: AppConfig;
@@ -31,7 +32,8 @@ export let refreshing = false;
 /** Emits "refreshed" when a background refresh cycle completes. */
 export const stateEvents = new EventEmitter();
 let refreshPromise: Promise<void> | null = null;
-let refreshInterval: ReturnType<typeof setInterval> | null = null;
+let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+let fullRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function getAppState(): AppState {
   if (!state) throw new Error("App not initialized. Call initAppState() first.");
@@ -85,6 +87,12 @@ export function refreshRuns(): Promise<void> {
 async function doRefresh(): Promise<void> {
   if (!state) return;
   refreshing = true;
+
+  // Cancel any in-flight active refresh to prevent concurrent config writes
+  if (refreshTimeout) {
+    clearTimeout(refreshTimeout);
+    refreshTimeout = null;
+  }
 
   try {
     // Check rate limit before doing anything
@@ -144,12 +152,35 @@ async function doRefresh(): Promise<void> {
       state.cache.setError(repo, message);
     }
 
-    // Persist newly discovered branches to config
+    // Persist newly discovered branches and workflow durations to config
+    let configDirty = false;
+
     if (Object.keys(discoveredBranches).length > 0) {
       state.config.branches = {
         ...state.config.branches,
         ...discoveredBranches,
       };
+      configDirty = true;
+    }
+
+    const allCompleted: WorkflowRun[] = [];
+    for (const [, repoRuns] of runs) {
+      for (const run of repoRuns) {
+        if (run.status === "completed" && run.duration > 0) {
+          allCompleted.push(run);
+        }
+      }
+    }
+    const updatedDurations = updateDurationHistory(
+      state.config.workflowDurations,
+      allCompleted,
+    );
+    if (updatedDurations) {
+      state.config.workflowDurations = updatedDurations;
+      configDirty = true;
+    }
+
+    if (configDirty) {
       await writeConfig(state.config);
     }
 
@@ -180,6 +211,8 @@ async function doRefresh(): Promise<void> {
   } finally {
     refreshing = false;
     stateEvents.emit("refreshed");
+    scheduleFullRefresh();
+    scheduleActiveRefresh();
   }
 }
 
@@ -211,16 +244,72 @@ export function startBackgroundRefresh(): void {
   // Skip immediate refresh if disk cache is fresh
   const newestEntry = getNewestCacheEntry(state);
   const cacheAgeMs = newestEntry ? Date.now() - newestEntry : Infinity;
-  const intervalMs = state.config.refreshInterval * 1000;
+  const configuredIntervalMs = state.config.refreshInterval * 1000;
 
-  if (cacheAgeMs < intervalMs) {
+  if (cacheAgeMs < configuredIntervalMs) {
     const ageMin = Math.round(cacheAgeMs / 60_000);
     console.log(`Cache is fresh (${ageMin}m old), skipping initial refresh`);
   } else {
     refreshRuns();
   }
 
-  refreshInterval = setInterval(() => refreshRuns(), intervalMs);
+  scheduleFullRefresh();
+  scheduleActiveRefresh();
+}
+
+/** Schedule the next full refresh (all repos) on the configured interval. */
+function scheduleFullRefresh(): void {
+  if (!state) return;
+  if (fullRefreshTimeout) clearTimeout(fullRefreshTimeout);
+
+  const configuredIntervalMs = state.config.refreshInterval * 1000;
+
+  fullRefreshTimeout = setTimeout(() => {
+    refreshRuns(); // reschedules via doRefresh's finally block
+  }, configuredIntervalMs);
+}
+
+/**
+ * Schedule a targeted refresh for only repos with active runs. If no repos
+ * have active runs, no timer is set (the full refresh handles idle mode).
+ */
+function scheduleActiveRefresh(): void {
+  if (!state) return;
+  if (refreshTimeout) clearTimeout(refreshTimeout);
+  refreshTimeout = null;
+
+  const configuredIntervalMs = state.config.refreshInterval * 1000;
+  const cachedEntries = getCachedRunEntries(state);
+  const { delayMs, activeRepos } = computeNextRefresh(
+    cachedEntries,
+    state.config.workflowDurations,
+    configuredIntervalMs,
+  );
+
+  if (activeRepos.length === 0) return; // idle — full refresh timer handles it
+
+  console.log(
+    `Active runs in ${activeRepos.length} repo(s), targeted refresh in ${Math.round(delayMs / 1000)}s`,
+  );
+
+  refreshTimeout = setTimeout(async () => {
+    for (const repo of activeRepos) {
+      if (refreshing) break; // full refresh took over — bail out
+      await refreshRepo(repo);
+    }
+    if (!refreshing) {
+      stateEvents.emit("refreshed");
+      scheduleActiveRefresh(); // reschedule for next check
+    }
+  }, delayMs);
+}
+
+function getCachedRunEntries(state: AppState): [string, WorkflowRun[]][] {
+  const result: [string, WorkflowRun[]][] = [];
+  for (const [repo, entry] of state.cache.entries()) {
+    result.push([repo, entry.data]);
+  }
+  return result;
 }
 
 function getNewestCacheEntry(state: AppState): number | null {
@@ -258,6 +347,17 @@ export async function refreshRepo(fullName: string): Promise<void> {
     if (runs.length > 0) {
       state.cache.set(fullName, runs);
       await state.cache.saveToDisk();
+
+      // Update duration history from completed runs
+      const completed = runs.filter((r) => r.status === "completed" && r.duration > 0);
+      const updatedDurations = updateDurationHistory(
+        state.config.workflowDurations,
+        completed,
+      );
+      if (updatedDurations) {
+        state.config.workflowDurations = updatedDurations;
+        await writeConfig(state.config);
+      }
     }
     // If runs is empty, keep existing cache — don't delete what we had
   } catch (err) {
@@ -266,9 +366,13 @@ export async function refreshRepo(fullName: string): Promise<void> {
 }
 
 export function stopBackgroundRefresh(): void {
-  if (refreshInterval) {
-    clearInterval(refreshInterval);
-    refreshInterval = null;
+  if (refreshTimeout) {
+    clearTimeout(refreshTimeout);
+    refreshTimeout = null;
+  }
+  if (fullRefreshTimeout) {
+    clearTimeout(fullRefreshTimeout);
+    fullRefreshTimeout = null;
   }
 }
 

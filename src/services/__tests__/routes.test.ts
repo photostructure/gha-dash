@@ -16,6 +16,7 @@ const mockRun: WorkflowRun = {
   createdAt: new Date().toISOString(),
   htmlUrl: "https://github.com/owner/repo/actions/runs/1",
   workflowPath: ".github/workflows/ci.yml",
+  startedAt: new Date().toISOString(),
 };
 
 const cache = new Cache<WorkflowRun[]>(60);

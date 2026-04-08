@@ -3,6 +3,7 @@ export interface AppConfig {
   availableRepos: string[]; // full set discovered from GitHub
   branches: Record<string, string>; // "owner/repo" → default branch name
   hiddenWorkflows: string[]; // hide workflows whose name contains any of these (case-insensitive)
+  workflowDurations: Record<string, number[]>; // workflowPath → last N completed durations (ms)
   refreshInterval: number; // seconds, default 300
   rateLimitFloor: number; // stop refreshing below this many remaining calls
   rateBudgetPct: number; // use at most this % of remaining rate limit per cycle
@@ -14,6 +15,7 @@ export const defaultConfig: AppConfig = {
   availableRepos: [],
   branches: {},
   hiddenWorkflows: ["dependabot"],
+  workflowDurations: {},
   refreshInterval: 3600,
   rateLimitFloor: 500,
   rateBudgetPct: 50,
@@ -33,6 +35,7 @@ export interface WorkflowRun {
   createdAt: string; // ISO 8601
   htmlUrl: string;
   workflowPath: string; // e.g. ".github/workflows/ci.yml"
+  startedAt: string; // ISO 8601 — run_started_at ?? created_at
 }
 
 export type RunStatus = "completed" | "in_progress" | "queued" | "waiting" | "pending";

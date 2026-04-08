@@ -15,6 +15,7 @@ const mockRun = (repo: string, workflowName: string): WorkflowRun => ({
   createdAt: new Date().toISOString(),
   htmlUrl: "https://github.com/test",
   workflowPath: ".github/workflows/ci.yml",
+  startedAt: new Date().toISOString(),
 });
 
 describe("cache pruning on repo change", () => {

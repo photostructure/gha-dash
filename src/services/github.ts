@@ -204,6 +204,7 @@ export async function fetchWorkflowRuns(
       createdAt: run.created_at,
       htmlUrl: run.html_url,
       workflowPath: path,
+      startedAt: run.run_started_at ?? run.created_at,
     });
   }
 
