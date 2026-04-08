@@ -35,6 +35,7 @@ export function useWorkflows(pollIntervalMs = 30_000) {
   const refreshingRepo = ref<string | null>(null);
 
   let timer: ReturnType<typeof setInterval> | null = null;
+  let eventSource: EventSource | null = null;
 
   async function fetchWorkflows(): Promise<boolean> {
     try {
@@ -88,10 +89,24 @@ export function useWorkflows(pollIntervalMs = 30_000) {
     }
     loading.value = false;
     timer = setInterval(fetchWorkflows, pollIntervalMs);
+
+    // SSE: server pushes when background refresh completes
+    eventSource = new EventSource("/api/events");
+    eventSource.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "refreshed") {
+          fetchWorkflows();
+        }
+      } catch {
+        // ignore malformed messages
+      }
+    };
   });
 
   onUnmounted(() => {
     if (timer) clearInterval(timer);
+    if (eventSource) eventSource.close();
   });
 
   return {

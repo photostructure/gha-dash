@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAppState, refreshRuns, refreshRepo, updateConfig } from "../state.js";
+import { getAppState, refreshing, refreshRuns, refreshRepo, stateEvents, updateConfig } from "../state.js";
 import { groupRunsByRepo } from "../services/workflows.js";
 import { getDispatchInfo, dispatchWorkflow } from "../services/dispatch.js";
 import type { CacheEntry, WorkflowRun } from "../types.js";
@@ -19,6 +19,26 @@ export function apiRoutes(): Router {
       groups,
       errors,
       rateLimit: state.rateLimit,
+    });
+  });
+
+  // GET /api/events — SSE stream for real-time updates
+  router.get("/events", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    // Send current refresh state immediately
+    res.write(`data: ${JSON.stringify({ type: "refreshing", refreshing })}\n\n`);
+
+    const onRefreshed = () => {
+      res.write(`data: ${JSON.stringify({ type: "refreshed" })}\n\n`);
+    };
+
+    stateEvents.on("refreshed", onRefreshed);
+    req.on("close", () => {
+      stateEvents.off("refreshed", onRefreshed);
     });
   });
 

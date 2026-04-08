@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import type { Octokit } from "@octokit/rest";
 import type { AppConfig, WorkflowRun } from "./types.js";
 import { Cache } from "./services/cache.js";
@@ -25,7 +26,10 @@ export interface AppState {
 }
 
 let state: AppState | null = null;
-let refreshing = false;
+export let refreshing = false;
+
+/** Emits "refreshed" when a background refresh cycle completes. */
+export const stateEvents = new EventEmitter();
 let refreshPromise: Promise<void> | null = null;
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -175,6 +179,7 @@ async function doRefresh(): Promise<void> {
     }
   } finally {
     refreshing = false;
+    stateEvents.emit("refreshed");
   }
 }
 

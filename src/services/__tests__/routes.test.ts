@@ -25,6 +25,10 @@ const mockUpdateConfig = vi.fn();
 const mockRefreshRuns = vi.fn();
 const mockRefreshRepo = vi.fn();
 
+// Minimal EventEmitter for SSE tests
+const { EventEmitter } = await import("node:events");
+const mockStateEvents = new EventEmitter();
+
 vi.mock("../../state.js", () => ({
   getAppState: () => ({
     config: { repos: ["owner/repo"], availableRepos: ["owner/repo", "owner/other"], branches: {}, hiddenWorkflows: [], refreshInterval: 60, rateLimitFloor: 500, rateBudgetPct: 50, port: 3131 },
@@ -34,6 +38,8 @@ vi.mock("../../state.js", () => ({
     repoStats: new Map([["owner/repo", { openPrs: 2, openIssues: 3, canPush: true }]]),
     rateLimit: { remaining: 4999, limit: 5000, checkedAt: new Date() },
   }),
+  refreshing: false,
+  stateEvents: mockStateEvents,
   updateConfig: (...args: unknown[]) => mockUpdateConfig(...args),
   refreshRuns: (...args: unknown[]) => mockRefreshRuns(...args),
   refreshRepo: (...args: unknown[]) => mockRefreshRepo(...args),
@@ -100,6 +106,35 @@ describe("API routes", () => {
     expect(res.status).toBe(200);
     expect(res.body.groups).toHaveLength(1);
     expect(mockRefreshRepo).toHaveBeenCalledWith("owner/repo");
+  });
+
+  it("GET /api/events returns SSE stream with initial state", async () => {
+    const { get } = await import("node:http");
+
+    const server = app.listen(0);
+    const port = (server.address() as { port: number }).port;
+
+    const data = await new Promise<string>((resolve, reject) => {
+      const req = get(`http://127.0.0.1:${port}/api/events`, (res) => {
+        expect(res.headers["content-type"]).toMatch(/text\/event-stream/);
+        expect(res.headers["cache-control"]).toBe("no-cache");
+
+        let buf = "";
+        res.on("data", (chunk) => {
+          buf += chunk.toString();
+          // Got the initial message — done
+          req.destroy();
+          resolve(buf);
+        });
+      });
+      req.on("error", (err) => {
+        if (err.message.includes("socket hang up")) return; // expected after destroy
+        reject(err);
+      });
+    });
+
+    expect(data).toContain('data: {"type":"refreshing","refreshing":false}');
+    server.close();
   });
 
   it("includes security headers", async () => {
