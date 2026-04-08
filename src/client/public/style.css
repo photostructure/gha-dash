@@ -177,6 +177,12 @@ th.sort-desc::after { content: ' \25BC'; }
   border-bottom: 1px solid var(--border);
 }
 
+.repo-header-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .repo-header:hover td { background: var(--border); }
 
 .collapse-icon {
@@ -186,13 +192,33 @@ th.sort-desc::after { content: ' \25BC'; }
   color: var(--text-muted);
 }
 
+/* Repo stats (PRs / issues) */
+.repo-stats {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.repo-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 12px;
+  background: var(--neutral-bg);
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.repo-stat-pill:hover { color: var(--link); text-decoration: none; background: var(--border); }
+.repo-stat-pill svg { flex-shrink: 0; }
+
 /* Collapsed status dots */
 .status-dots {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: 8px;
-  vertical-align: middle;
 }
 
 .status-dot {
@@ -208,17 +234,16 @@ th.sort-desc::after { content: ' \25BC'; }
 .dot-cancelled, .dot-skipped, .dot-timed_out { background: var(--neutral); }
 
 .btn-refresh {
+  display: inline-flex;
+  align-items: center;
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   font-size: 14px;
-  margin-left: 8px;
+  margin-left: auto;
   padding: 0 4px;
-  vertical-align: middle;
 }
-
-.btn-refresh { display: inline-flex; align-items: center; }
 
 .btn-refresh:hover { color: var(--link); }
 .btn-refresh.spinning { font-size: 0; }

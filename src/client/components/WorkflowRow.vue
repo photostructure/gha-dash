@@ -5,7 +5,7 @@ import { formatDuration, relativeTime } from "../../types.js";
 import StatusBadge from "./StatusBadge.vue";
 import DispatchForm from "./DispatchForm.vue";
 
-defineProps<{ run: WorkflowRun }>();
+defineProps<{ run: WorkflowRun; canPush: boolean }>();
 
 const showDispatch = ref(false);
 
@@ -40,7 +40,14 @@ function workflowUrl(run: WorkflowRun): string {
   </tr>
   <tr v-if="showDispatch" class="dispatch-row" :data-repo="run.repo">
     <td colspan="8">
-      <DispatchForm :run="run" @close="showDispatch = false" />
+      <DispatchForm v-if="canPush" :run="run" @close="showDispatch = false" />
+      <div v-else class="dispatch-form">
+        <div class="dispatch-result dispatch-error">
+          Your <code>gh</code> CLI token does not have write access to <strong>{{ run.repo }}</strong>.
+          Run <code>gh auth refresh -s workflow</code> to add the workflow scope.
+        </div>
+        <button type="button" class="btn" @click="showDispatch = false" style="margin-top: 8px;">Close</button>
+      </div>
     </td>
   </tr>
 </template>
