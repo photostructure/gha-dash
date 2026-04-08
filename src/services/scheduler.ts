@@ -1,6 +1,11 @@
 import type { WorkflowRun } from "../types.js";
 
-export const ACTIVE_STATUSES = new Set(["queued", "in_progress", "waiting", "pending"]);
+export const ACTIVE_STATUSES = new Set([
+  "queued",
+  "in_progress",
+  "waiting",
+  "pending",
+]);
 export const MIN_REFRESH_INTERVAL_MS = 15_000;
 export const DEFAULT_EXPECTED_DURATION_MS = 300_000; // 5 minutes
 export const MAX_DURATION_SAMPLES = 5;
@@ -34,7 +39,8 @@ export function computeNextRefresh(
       activeRepoSet.add(repo);
 
       const history = workflowDurations[run.workflowPath];
-      const expectedDuration = median(history ?? []) ?? DEFAULT_EXPECTED_DURATION_MS;
+      const expectedDuration =
+        median(history ?? []) ?? DEFAULT_EXPECTED_DURATION_MS;
       const startedAtMs = new Date(run.startedAt).getTime();
       const expectedDone = startedAtMs + expectedDuration;
       const timeUntilDone = expectedDone - now;
@@ -47,7 +53,10 @@ export function computeNextRefresh(
     return { delayMs: configuredIntervalMs, activeRepos: [] };
   }
 
-  const delayMs = Math.max(MIN_REFRESH_INTERVAL_MS, Math.min(earliestTimeUntilDone, configuredIntervalMs));
+  const delayMs = Math.max(
+    MIN_REFRESH_INTERVAL_MS,
+    Math.min(earliestTimeUntilDone, configuredIntervalMs),
+  );
   return { delayMs, activeRepos: [...activeRepoSet] };
 }
 
@@ -81,7 +90,8 @@ export function updateDurationHistory(
     // Skip if the last recorded duration matches — catches the common case of the
     // same completed run appearing in consecutive fetches. Can also skip a genuinely
     // different run with an identical duration, but losing one sample out of 5 is fine.
-    if (existing.length > 0 && existing[existing.length - 1] === run.duration) continue;
+    if (existing.length > 0 && existing[existing.length - 1] === run.duration)
+      continue;
 
     const updated = [...existing, run.duration];
     if (updated.length > MAX_DURATION_SAMPLES) {

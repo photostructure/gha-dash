@@ -137,7 +137,9 @@ Declare variables near first use, initialize immediately. Reduces mental scope t
 Extract complex expressions into named variables. Names explain meaning, not just computation.
 
 ```typescript
-const hasActiveRuns = runs.some(r => r.status === "in_progress" || r.status === "queued");
+const hasActiveRuns = runs.some(
+  (r) => r.status === "in_progress" || r.status === "queued",
+);
 if (hasActiveRuns) {
   // use shorter poll interval
 }

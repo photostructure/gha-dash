@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readConfig, writeConfig } from "../config.js";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultConfig } from "../../types.js";
+import { readConfig, writeConfig } from "../config.js";
 
 // Use a temp dir for config during tests
 const testDir = join(tmpdir(), `gha-dash-test-${process.pid}`);

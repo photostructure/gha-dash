@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { WorkflowRun } from "../../types.js";
 import {
   computeNextRefresh,
-  median,
-  updateDurationHistory,
-  MIN_REFRESH_INTERVAL_MS,
   MAX_DURATION_SAMPLES,
+  median,
+  MIN_REFRESH_INTERVAL_MS,
+  updateDurationHistory,
 } from "../scheduler.js";
 
 function makeRun(overrides: Partial<WorkflowRun> = {}): WorkflowRun {
@@ -61,7 +61,11 @@ describe("computeNextRefresh", () => {
 
   it("returns configured interval with no active repos when idle", () => {
     const runs = [makeRun({ status: "completed" })];
-    const result = computeNextRefresh(entries("owner/repo", runs), {}, configuredInterval);
+    const result = computeNextRefresh(
+      entries("owner/repo", runs),
+      {},
+      configuredInterval,
+    );
     expect(result.delayMs).toBe(configuredInterval);
     expect(result.activeRepos).toEqual([]);
   });
@@ -75,15 +79,22 @@ describe("computeNextRefresh", () => {
   it("uses duration history to compute expected completion", () => {
     const now = Date.now();
     const startedAt = new Date(now - 200_000).toISOString(); // started 200s ago
-    const runs = [makeRun({
-      status: "in_progress",
-      conclusion: null,
-      startedAt,
-      workflowPath: ".github/workflows/ci.yml",
-    })];
+    const runs = [
+      makeRun({
+        status: "in_progress",
+        conclusion: null,
+        startedAt,
+        workflowPath: ".github/workflows/ci.yml",
+      }),
+    ];
     const durations = { ".github/workflows/ci.yml": [300_000] }; // typically 300s
 
-    const result = computeNextRefresh(entries("owner/repo", runs), durations, configuredInterval, now);
+    const result = computeNextRefresh(
+      entries("owner/repo", runs),
+      durations,
+      configuredInterval,
+      now,
+    );
 
     // Expected completion in ~100s
     expect(result.delayMs).toBeGreaterThan(90_000);
@@ -94,13 +105,20 @@ describe("computeNextRefresh", () => {
   it("uses default duration when no history exists", () => {
     const now = Date.now();
     const startedAt = new Date(now - 100_000).toISOString(); // started 100s ago
-    const runs = [makeRun({
-      status: "queued",
-      conclusion: null,
-      startedAt,
-    })];
+    const runs = [
+      makeRun({
+        status: "queued",
+        conclusion: null,
+        startedAt,
+      }),
+    ];
 
-    const result = computeNextRefresh(entries("owner/repo", runs), {}, configuredInterval, now);
+    const result = computeNextRefresh(
+      entries("owner/repo", runs),
+      {},
+      configuredInterval,
+      now,
+    );
 
     // Default 300s - 100s elapsed = 200s
     expect(result.delayMs).toBeGreaterThan(190_000);
@@ -111,15 +129,22 @@ describe("computeNextRefresh", () => {
   it("returns minimum interval when past expected completion", () => {
     const now = Date.now();
     const startedAt = new Date(now - 600_000).toISOString(); // started 10min ago
-    const runs = [makeRun({
-      status: "in_progress",
-      conclusion: null,
-      startedAt,
-      workflowPath: ".github/workflows/ci.yml",
-    })];
+    const runs = [
+      makeRun({
+        status: "in_progress",
+        conclusion: null,
+        startedAt,
+        workflowPath: ".github/workflows/ci.yml",
+      }),
+    ];
     const durations = { ".github/workflows/ci.yml": [300_000] }; // typically 5min
 
-    const result = computeNextRefresh(entries("owner/repo", runs), durations, configuredInterval, now);
+    const result = computeNextRefresh(
+      entries("owner/repo", runs),
+      durations,
+      configuredInterval,
+      now,
+    );
 
     expect(result.delayMs).toBe(MIN_REFRESH_INTERVAL_MS);
     expect(result.activeRepos).toEqual(["owner/repo"]);
@@ -146,7 +171,12 @@ describe("computeNextRefresh", () => {
       ".github/workflows/deploy.yml": [300_000],
     };
 
-    const result = computeNextRefresh(entries("owner/repo", runs), durations, configuredInterval, now);
+    const result = computeNextRefresh(
+      entries("owner/repo", runs),
+      durations,
+      configuredInterval,
+      now,
+    );
 
     // Should pick the closer one (~50s), but clamped to minimum
     expect(result.delayMs).toBeGreaterThanOrEqual(MIN_REFRESH_INTERVAL_MS);
@@ -167,7 +197,12 @@ describe("computeNextRefresh", () => {
     ];
     const durations = { ".github/workflows/ci.yml": [300_000] };
 
-    const result = computeNextRefresh(entries("owner/repo", runs), durations, configuredInterval, now);
+    const result = computeNextRefresh(
+      entries("owner/repo", runs),
+      durations,
+      configuredInterval,
+      now,
+    );
 
     // 300s - 100s = 200s
     expect(result.delayMs).toBeGreaterThan(190_000);
@@ -177,15 +212,22 @@ describe("computeNextRefresh", () => {
 
   it("clamps to configured interval even if expected completion is far away", () => {
     const now = Date.now();
-    const runs = [makeRun({
-      status: "queued",
-      conclusion: null,
-      startedAt: new Date(now).toISOString(), // just started
-      workflowPath: ".github/workflows/ci.yml",
-    })];
+    const runs = [
+      makeRun({
+        status: "queued",
+        conclusion: null,
+        startedAt: new Date(now).toISOString(), // just started
+        workflowPath: ".github/workflows/ci.yml",
+      }),
+    ];
     const durations = { ".github/workflows/ci.yml": [7_200_000] }; // 2 hours
 
-    const result = computeNextRefresh(entries("owner/repo", runs), durations, configuredInterval, now);
+    const result = computeNextRefresh(
+      entries("owner/repo", runs),
+      durations,
+      configuredInterval,
+      now,
+    );
 
     expect(result.delayMs).toBe(configuredInterval);
     expect(result.activeRepos).toEqual(["owner/repo"]);
@@ -196,12 +238,17 @@ describe("computeNextRefresh", () => {
     const result = computeNextRefresh(
       [
         ["owner/idle-repo", [makeRun({ status: "completed" })]],
-        ["owner/active-repo", [makeRun({
-          status: "in_progress",
-          conclusion: null,
-          startedAt: new Date(now - 280_000).toISOString(),
-          workflowPath: ".github/workflows/ci.yml",
-        })]],
+        [
+          "owner/active-repo",
+          [
+            makeRun({
+              status: "in_progress",
+              conclusion: null,
+              startedAt: new Date(now - 280_000).toISOString(),
+              workflowPath: ".github/workflows/ci.yml",
+            }),
+          ],
+        ],
       ],
       { ".github/workflows/ci.yml": [300_000] },
       configuredInterval,
@@ -244,14 +291,20 @@ describe("updateDurationHistory", () => {
 
   it("caps history at MAX_DURATION_SAMPLES", () => {
     const current = { ".github/workflows/ci.yml": [100, 200, 300, 400, 500] };
-    expect(current[".github/workflows/ci.yml"]).toHaveLength(MAX_DURATION_SAMPLES);
+    expect(current[".github/workflows/ci.yml"]).toHaveLength(
+      MAX_DURATION_SAMPLES,
+    );
 
     const result = updateDurationHistory(current, [
       makeRun({ workflowPath: ".github/workflows/ci.yml", duration: 600 }),
     ]);
 
-    expect(result![".github/workflows/ci.yml"]).toHaveLength(MAX_DURATION_SAMPLES);
-    expect(result![".github/workflows/ci.yml"]).toEqual([200, 300, 400, 500, 600]);
+    expect(result![".github/workflows/ci.yml"]).toHaveLength(
+      MAX_DURATION_SAMPLES,
+    );
+    expect(result![".github/workflows/ci.yml"]).toEqual([
+      200, 300, 400, 500, 600,
+    ]);
   });
 
   it("ignores runs with zero or negative duration", () => {

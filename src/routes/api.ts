@@ -1,7 +1,14 @@
 import { Router } from "express";
-import { getAppState, refreshing, refreshRuns, refreshRepo, stateEvents, updateConfig } from "../state.js";
+import { dispatchWorkflow, getDispatchInfo } from "../services/dispatch.js";
 import { groupRunsByRepo } from "../services/workflows.js";
-import { getDispatchInfo, dispatchWorkflow } from "../services/dispatch.js";
+import {
+  getAppState,
+  refreshing,
+  refreshRepo,
+  refreshRuns,
+  stateEvents,
+  updateConfig,
+} from "../state.js";
 import type { CacheEntry, WorkflowRun } from "../types.js";
 
 export function apiRoutes(): Router {
@@ -30,7 +37,9 @@ export function apiRoutes(): Router {
     res.flushHeaders();
 
     // Send current refresh state immediately
-    res.write(`data: ${JSON.stringify({ type: "refreshing", refreshing })}\n\n`);
+    res.write(
+      `data: ${JSON.stringify({ type: "refreshing", refreshing })}\n\n`,
+    );
 
     const onRefreshed = () => {
       res.write(`data: ${JSON.stringify({ type: "refreshed" })}\n\n`);
@@ -134,7 +143,9 @@ export function apiRoutes(): Router {
       );
 
       if (!info) {
-        res.status(400).json({ error: "This workflow does not support manual dispatch" });
+        res
+          .status(400)
+          .json({ error: "This workflow does not support manual dispatch" });
         return;
       }
 
@@ -182,7 +193,14 @@ export function apiRoutes(): Router {
         }
       }
 
-      await dispatchWorkflow(state.octokit, owner, repo, workflowId, ref, inputs);
+      await dispatchWorkflow(
+        state.octokit,
+        owner,
+        repo,
+        workflowId,
+        ref,
+        inputs,
+      );
 
       res.json({
         success: true,
@@ -213,7 +231,9 @@ function findRun(
 ): WorkflowRun | undefined {
   const state = getAppState();
   const fullName = `${owner}/${repo}`;
-  const entry = state.cache.get(fullName) as CacheEntry<WorkflowRun[]> | undefined;
+  const entry = state.cache.get(fullName) as
+    | CacheEntry<WorkflowRun[]>
+    | undefined;
   if (!entry) return undefined;
   return entry.data.find((r) => r.workflowId === workflowId);
 }

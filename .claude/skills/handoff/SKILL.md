@@ -37,6 +37,7 @@ exactly where we left off. This is critical — anything not written down is los
 ### What Good Handoff Looks Like
 
 The next session should be able to:
+
 - Understand the current state without re-reading the entire codebase
 - Know exactly which step to start on
 - Avoid repeating any failed approaches

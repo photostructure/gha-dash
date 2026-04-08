@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { useDispatch } from "../composables/useDispatch";
+import { onMounted, ref } from "vue";
 import type { WorkflowRun } from "../../types.js";
+import { useDispatch } from "../composables/useDispatch";
 
 const props = defineProps<{ run: WorkflowRun }>();
 const emit = defineEmits<{ close: [] }>();
@@ -32,7 +32,13 @@ async function submit() {
       }
     }
   }
-  await dispatch.trigger(owner, repo, props.run.workflowId, formRef.value, inputs);
+  await dispatch.trigger(
+    owner,
+    repo,
+    props.run.workflowId,
+    formRef.value,
+    inputs,
+  );
 }
 </script>
 
@@ -40,7 +46,9 @@ async function submit() {
   <div class="dispatch-form">
     <template v-if="dispatch.loading.value">Loading...</template>
     <template v-else-if="dispatch.error.value">
-      <div class="dispatch-result dispatch-error">{{ dispatch.error.value }}</div>
+      <div class="dispatch-result dispatch-error">
+        {{ dispatch.error.value }}
+      </div>
       <button type="button" class="btn" @click="emit('close')">Close</button>
     </template>
     <template v-else-if="dispatch.info.value">
@@ -48,19 +56,36 @@ async function submit() {
 
       <template v-if="!dispatch.result.value">
         <div class="form-field">
-          <label for="dispatch-ref">Branch / tag <span class="required">*</span></label>
-          <input id="dispatch-ref" type="text" v-model="formRef" aria-required="true">
+          <label for="dispatch-ref"
+            >Branch / tag <span class="required">*</span></label
+          >
+          <input
+            id="dispatch-ref"
+            type="text"
+            v-model="formRef"
+            aria-required="true"
+          />
         </div>
 
-        <div v-for="input in dispatch.info.value.inputs" :key="input.name" class="form-field">
+        <div
+          v-for="input in dispatch.info.value.inputs"
+          :key="input.name"
+          class="form-field"
+        >
           <label :for="`input-${input.name}`">
             {{ input.name }}
             <span v-if="input.required" class="required">*</span>
           </label>
 
           <template v-if="input.type === 'choice'">
-            <select :id="`input-${input.name}`" v-model="formInputs[input.name]" :aria-required="input.required">
-              <option v-for="opt in input.options" :key="opt" :value="opt">{{ opt }}</option>
+            <select
+              :id="`input-${input.name}`"
+              v-model="formInputs[input.name]"
+              :aria-required="input.required"
+            >
+              <option v-for="opt in input.options" :key="opt" :value="opt">
+                {{ opt }}
+              </option>
             </select>
           </template>
           <template v-else-if="input.type === 'boolean'">
@@ -68,33 +93,74 @@ async function submit() {
               <input
                 type="checkbox"
                 :checked="formInputs[input.name] === 'true'"
-                @change="formInputs[input.name] = ($event.target as HTMLInputElement).checked ? 'true' : 'false'"
-              >
+                @change="
+                  formInputs[input.name] = ($event.target as HTMLInputElement)
+                    .checked
+                    ? 'true'
+                    : 'false'
+                "
+              />
             </label>
           </template>
           <template v-else>
-            <input :id="`input-${input.name}`" type="text" v-model="formInputs[input.name]" :aria-required="input.required">
+            <input
+              :id="`input-${input.name}`"
+              type="text"
+              v-model="formInputs[input.name]"
+              :aria-required="input.required"
+            />
           </template>
 
-          <span v-if="input.description" class="field-help">{{ input.description }}</span>
+          <span v-if="input.description" class="field-help">{{
+            input.description
+          }}</span>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="btn btn-primary" @click="submit" :disabled="dispatch.submitting.value">
+          <button
+            type="button"
+            class="btn btn-primary"
+            @click="submit"
+            :disabled="dispatch.submitting.value"
+          >
             {{ dispatch.submitting.value ? "Dispatching..." : "Run workflow" }}
           </button>
-          <button type="button" class="btn" @click="emit('close')">Cancel</button>
+          <button type="button" class="btn" @click="emit('close')">
+            Cancel
+          </button>
         </div>
       </template>
 
       <template v-else>
-        <div class="dispatch-result" :class="dispatch.result.value.success ? 'dispatch-success' : 'dispatch-error'">
+        <div
+          class="dispatch-result"
+          :class="
+            dispatch.result.value.success
+              ? 'dispatch-success'
+              : 'dispatch-error'
+          "
+        >
           {{ dispatch.result.value.message }}
-          <template v-if="dispatch.result.value.success && dispatch.result.value.runUrl">
-            &mdash; <a :href="dispatch.result.value.runUrl" target="_blank" rel="noopener">View runs</a>
+          <template
+            v-if="dispatch.result.value.success && dispatch.result.value.runUrl"
+          >
+            &mdash;
+            <a
+              :href="dispatch.result.value.runUrl"
+              target="_blank"
+              rel="noopener"
+              >View runs</a
+            >
           </template>
         </div>
-        <button type="button" class="btn" @click="emit('close')" style="margin-top: 8px;">Close</button>
+        <button
+          type="button"
+          class="btn"
+          @click="emit('close')"
+          style="margin-top: 8px"
+        >
+          Close
+        </button>
       </template>
     </template>
   </div>

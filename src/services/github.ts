@@ -1,5 +1,5 @@
-import { execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
+import { execSync } from "node:child_process";
 import pLimit from "p-limit";
 import type { WorkflowRun } from "../types.js";
 
@@ -17,9 +17,7 @@ export function extractToken(): string {
   try {
     return execSync("gh auth token", { encoding: "utf-8" }).trim();
   } catch {
-    throw new Error(
-      "gh CLI not authenticated. Run: gh auth login",
-    );
+    throw new Error("gh CLI not authenticated. Run: gh auth login");
   }
 }
 
@@ -34,18 +32,14 @@ export async function fetchAuthenticatedUser(
   return data.login;
 }
 
-export async function fetchUserOrgs(
-  octokit: Octokit,
-): Promise<string[]> {
+export async function fetchUserOrgs(octokit: Octokit): Promise<string[]> {
   const orgs = await octokit.paginate(octokit.orgs.listForAuthenticatedUser, {
     per_page: 100,
   });
   return orgs.map((o) => o.login);
 }
 
-export async function fetchUserRepos(
-  octokit: Octokit,
-): Promise<string[]> {
+export async function fetchUserRepos(octokit: Octokit): Promise<string[]> {
   const repos = await octokit.paginate(octokit.repos.listForAuthenticatedUser, {
     per_page: 100,
     affiliation: "owner,organization_member",
@@ -112,7 +106,9 @@ export async function fetchRepoStats(
 
   let openPrs = resp.data.length;
   if (openPrs > 0) {
-    const link = (resp as unknown as { headers: Record<string, string> }).headers.link ?? "";
+    const link =
+      (resp as unknown as { headers: Record<string, string> }).headers.link ??
+      "";
     const lastMatch = link.match(/[&?]page=(\d+)[^>]*>;\s*rel="last"/);
     if (lastMatch) openPrs = parseInt(lastMatch[1], 10);
   }
@@ -133,14 +129,13 @@ export async function fetchActiveWorkflowIds(
   owner: string,
   repo: string,
 ): Promise<Set<number>> {
-  const workflows = await octokit.paginate(
-    octokit.actions.listRepoWorkflows,
-    { owner, repo, per_page: 100 },
-  );
+  const workflows = await octokit.paginate(octokit.actions.listRepoWorkflows, {
+    owner,
+    repo,
+    per_page: 100,
+  });
   return new Set(
-    workflows
-      .filter((w) => w.state === "active")
-      .map((w) => w.id),
+    workflows.filter((w) => w.state === "active").map((w) => w.id),
   );
 }
 
@@ -163,7 +158,12 @@ export async function fetchWorkflowRuns(
 
   // Keep all active runs + latest completed run per workflow.
   // Runs are sorted newest-first by the API.
-  const ACTIVE_STATUSES = new Set(["queued", "in_progress", "waiting", "pending"]);
+  const ACTIVE_STATUSES = new Set([
+    "queued",
+    "in_progress",
+    "waiting",
+    "pending",
+  ]);
   const results: WorkflowRun[] = [];
   const seenCompleted = new Set<number>();
 
@@ -183,13 +183,17 @@ export async function fetchWorkflowRuns(
       run.status === "completed" && run.updated_at
         ? new Date(run.updated_at).getTime() -
           new Date(run.run_started_at ?? run.created_at).getTime()
-        : Date.now() -
-          new Date(run.run_started_at ?? run.created_at).getTime();
+        : Date.now() - new Date(run.run_started_at ?? run.created_at).getTime();
 
     // Derive workflow name from path: .github/workflows/build.yml → "build"
     const path = run.path ?? "";
-    const fileName = path.split("/").pop()?.replace(/\.(yml|yaml)$/, "") ?? "";
-    const workflowName = fileName || (run.name ?? `Workflow ${run.workflow_id}`);
+    const fileName =
+      path
+        .split("/")
+        .pop()
+        ?.replace(/\.(yml|yaml)$/, "") ?? "";
+    const workflowName =
+      fileName || (run.name ?? `Workflow ${run.workflow_id}`);
 
     results.push({
       workflowId: run.workflow_id,
@@ -260,10 +264,21 @@ export async function fetchAllRuns(
 
           const [activeIds, repoStats] = await Promise.all([
             fetchActiveWorkflowIds(octokit, owner, repo),
-            fetchRepoStats(octokit, owner, repo, meta.openIssuesAndPrs, meta.canPush),
+            fetchRepoStats(
+              octokit,
+              owner,
+              repo,
+              meta.openIssuesAndPrs,
+              meta.canPush,
+            ),
           ]);
 
-          const result = await fetchWorkflowRuns(octokit, owner, repo, activeIds);
+          const result = await fetchWorkflowRuns(
+            octokit,
+            owner,
+            repo,
+            activeIds,
+          );
           runs.set(fullName, result);
           stats.set(fullName, repoStats);
         } catch (err) {

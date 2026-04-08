@@ -13,5 +13,6 @@ const status = computed(() => displayStatus(props.run));
     class="status-badge"
     :class="`status-${status}`"
     :aria-label="`Status: ${status}`"
-  >{{ status }}</span>
+    >{{ status }}</span
+  >
 </template>

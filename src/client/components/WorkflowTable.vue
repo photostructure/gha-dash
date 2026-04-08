@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
-import type { RepoGroup } from "../composables/useWorkflows";
+import { computed, ref, watch } from "vue";
 import type { WorkflowRun } from "../../types.js";
 import { displayStatus } from "../../types.js";
+import type { RepoGroup } from "../composables/useWorkflows";
 import RepoGroupComponent from "./RepoGroup.vue";
 import SearchToolbar from "./SearchToolbar.vue";
 
@@ -25,20 +25,29 @@ const collapsedRepos = ref<Record<string, boolean>>(
 );
 
 // Persist collapse state
-watch(collapsedRepos, (val) => {
-  localStorage.setItem("gha-dash-collapsed", JSON.stringify(val));
-}, { deep: true });
+watch(
+  collapsedRepos,
+  (val) => {
+    localStorage.setItem("gha-dash-collapsed", JSON.stringify(val));
+  },
+  { deep: true },
+);
 
 // --- Sorting ---
 type SortableCol = "workflow" | "branch" | "status" | "started" | "duration";
 
 function getSortValue(run: WorkflowRun, col: SortableCol): string | number {
   switch (col) {
-    case "workflow": return run.workflowName.toLowerCase();
-    case "branch": return run.branch.toLowerCase();
-    case "status": return displayStatus(run);
-    case "started": return run.createdAt;
-    case "duration": return run.duration;
+    case "workflow":
+      return run.workflowName.toLowerCase();
+    case "branch":
+      return run.branch.toLowerCase();
+    case "status":
+      return displayStatus(run);
+    case "started":
+      return run.createdAt;
+    case "duration":
+      return run.duration;
   }
 }
 
@@ -60,11 +69,12 @@ function filterRuns(runs: WorkflowRun[]): WorkflowRun[] {
   let result = runs;
   const q = searchQuery.value.toLowerCase();
   if (q) {
-    result = result.filter((r) =>
-      r.workflowName.toLowerCase().includes(q) ||
-      r.branch.toLowerCase().includes(q) ||
-      r.commitMessage.toLowerCase().includes(q) ||
-      r.repo.toLowerCase().includes(q)
+    result = result.filter(
+      (r) =>
+        r.workflowName.toLowerCase().includes(q) ||
+        r.branch.toLowerCase().includes(q) ||
+        r.commitMessage.toLowerCase().includes(q) ||
+        r.repo.toLowerCase().includes(q),
     );
   }
   if (failuresOnly.value) {
@@ -134,22 +144,56 @@ function collapseAll() {
   <table class="workflow-table">
     <thead>
       <tr>
-        <th scope="col" :class="sortClass('workflow')" @click="toggleSort('workflow')">Workflow</th>
-        <th scope="col" :class="sortClass('branch')" @click="toggleSort('branch')">Branch</th>
-        <th scope="col" :class="sortClass('status')" @click="toggleSort('status')">Status</th>
+        <th
+          scope="col"
+          :class="sortClass('workflow')"
+          @click="toggleSort('workflow')"
+        >
+          Workflow
+        </th>
+        <th
+          scope="col"
+          :class="sortClass('branch')"
+          @click="toggleSort('branch')"
+        >
+          Branch
+        </th>
+        <th
+          scope="col"
+          :class="sortClass('status')"
+          @click="toggleSort('status')"
+        >
+          Status
+        </th>
         <th scope="col">Commit</th>
         <th scope="col">Message</th>
-        <th scope="col" :class="sortClass('started')" @click="toggleSort('started')">Started</th>
-        <th scope="col" :class="sortClass('duration')" @click="toggleSort('duration')">Duration</th>
+        <th
+          scope="col"
+          :class="sortClass('started')"
+          @click="toggleSort('started')"
+        >
+          Started
+        </th>
+        <th
+          scope="col"
+          :class="sortClass('duration')"
+          @click="toggleSort('duration')"
+        >
+          Duration
+        </th>
         <th scope="col" class="actions-col"></th>
       </tr>
     </thead>
     <tbody aria-live="polite">
       <template v-if="processedGroups.length === 0 && groups.length === 0">
-        <tr><td colspan="8" class="loading">Loading workflow data...</td></tr>
+        <tr>
+          <td colspan="8" class="loading">Loading workflow data...</td>
+        </tr>
       </template>
       <template v-else-if="processedGroups.length === 0">
-        <tr><td colspan="8" class="no-runs">No matching workflows</td></tr>
+        <tr>
+          <td colspan="8" class="no-runs">No matching workflows</td>
+        </tr>
       </template>
       <template v-else>
         <RepoGroupComponent

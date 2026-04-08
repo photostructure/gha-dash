@@ -1,21 +1,24 @@
-import { EventEmitter } from "node:events";
 import type { Octokit } from "@octokit/rest";
-import type { AppConfig, WorkflowRun } from "./types.js";
+import { EventEmitter } from "node:events";
 import { Cache } from "./services/cache.js";
+import { readConfig, writeConfig } from "./services/config.js";
+import type { RepoStats } from "./services/github.js";
 import {
   createOctokit,
   extractToken,
   fetchActiveWorkflowIds,
   fetchAllRuns,
+  fetchRateLimit,
   fetchRepoMeta,
   fetchRepoStats,
-  fetchRateLimit,
   fetchUserRepos,
   fetchWorkflowRuns,
 } from "./services/github.js";
-import type { RepoStats } from "./services/github.js";
-import { readConfig, writeConfig } from "./services/config.js";
-import { computeNextRefresh, updateDurationHistory } from "./services/scheduler.js";
+import {
+  computeNextRefresh,
+  updateDurationHistory,
+} from "./services/scheduler.js";
+import type { AppConfig, WorkflowRun } from "./types.js";
 
 export interface AppState {
   config: AppConfig;
@@ -36,7 +39,8 @@ let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
 let fullRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function getAppState(): AppState {
-  if (!state) throw new Error("App not initialized. Call initAppState() first.");
+  if (!state)
+    throw new Error("App not initialized. Call initAppState() first.");
   return state;
 }
 
@@ -80,7 +84,9 @@ export async function initAppState(): Promise<AppState> {
 export function refreshRuns(): Promise<void> {
   if (!state) return Promise.resolve();
   if (refreshPromise) return refreshPromise;
-  refreshPromise = doRefresh().finally(() => { refreshPromise = null; });
+  refreshPromise = doRefresh().finally(() => {
+    refreshPromise = null;
+  });
   return refreshPromise;
 }
 
@@ -97,7 +103,10 @@ async function doRefresh(): Promise<void> {
   try {
     // Check rate limit before doing anything
     try {
-      state.rateLimit = { ...await fetchRateLimit(state.octokit), checkedAt: new Date() };
+      state.rateLimit = {
+        ...(await fetchRateLimit(state.octokit)),
+        checkedAt: new Date(),
+      };
     } catch {
       // Can't check rate limit — proceed cautiously
     }
@@ -188,7 +197,10 @@ async function doRefresh(): Promise<void> {
 
     // Update rate limit after the fetch
     try {
-      state.rateLimit = { ...await fetchRateLimit(state.octokit), checkedAt: new Date() };
+      state.rateLimit = {
+        ...(await fetchRateLimit(state.octokit)),
+        checkedAt: new Date(),
+      };
       console.log(
         `Refreshed ${runs.size} repos. API: ${state.rateLimit.remaining}/${state.rateLimit.limit} remaining`,
       );
@@ -203,7 +215,9 @@ async function doRefresh(): Promise<void> {
         state.octokit = createOctokit(newToken);
         console.log("Re-extracted GitHub token after 401");
       } catch {
-        console.error("Token expired and re-extraction failed. Run: gh auth login");
+        console.error(
+          "Token expired and re-extraction failed. Run: gh auth login",
+        );
       }
     } else {
       console.error("Refresh failed:", (err as Error).message);
@@ -221,7 +235,10 @@ async function doRefresh(): Promise<void> {
  * Each repo costs 1 API call (runs) + possibly 1 (branch, if not cached).
  * Returns undefined if no budget constraint applies (fetch all).
  */
-function computeBudget(state: AppState, totalRepos: number): number | undefined {
+function computeBudget(
+  state: AppState,
+  totalRepos: number,
+): number | undefined {
   if (!state.rateLimit) return undefined;
 
   const { remaining, limit } = state.rateLimit;
@@ -338,7 +355,13 @@ export async function refreshRepo(fullName: string): Promise<void> {
   try {
     const [activeIds, repoStats] = await Promise.all([
       fetchActiveWorkflowIds(state.octokit, owner, repo),
-      fetchRepoStats(state.octokit, owner, repo, meta.openIssuesAndPrs, meta.canPush),
+      fetchRepoStats(
+        state.octokit,
+        owner,
+        repo,
+        meta.openIssuesAndPrs,
+        meta.canPush,
+      ),
     ]);
     state.repoStats.set(fullName, repoStats);
 
@@ -349,7 +372,9 @@ export async function refreshRepo(fullName: string): Promise<void> {
       await state.cache.saveToDisk();
 
       // Update duration history from completed runs
-      const completed = runs.filter((r) => r.status === "completed" && r.duration > 0);
+      const completed = runs.filter(
+        (r) => r.status === "completed" && r.duration > 0,
+      );
       const updatedDurations = updateDurationHistory(
         state.config.workflowDurations,
         completed,
@@ -376,9 +401,7 @@ export function stopBackgroundRefresh(): void {
   }
 }
 
-export async function updateConfig(
-  updates: Partial<AppConfig>,
-): Promise<void> {
+export async function updateConfig(updates: Partial<AppConfig>): Promise<void> {
   if (!state) return;
 
   // If repos changed, prune cache to only keep selected repos

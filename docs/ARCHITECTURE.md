@@ -30,23 +30,23 @@ Shared context for all gha-dash TPPs. This is a reference doc, not a TPP.
 
 ## Tech Stack
 
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Runtime | Node.js 20+ | ESM support |
-| Language | TypeScript (strict, ESM) | `"type": "module"` in package.json |
-| Server | Express 5 | Mature, well-known |
-| Frontend | Vue 3 (Composition API) | Reactive UI, component model |
-| Routing | vue-router | SPA navigation (dashboard, settings) |
-| Build (client) | Vite | Fast dev server + production bundling |
-| Styling | Custom CSS | Hand-written, CSS variables, dark mode |
-| GitHub API | @octokit/rest | Official SDK, pagination, rate limits |
-| Concurrency | p-limit | Cap parallel API calls (~10) |
-| YAML parsing | yaml | For workflow_dispatch inputs |
-| Config | XDG/APPDATA + fs | No dependency — see Config section |
-| Test runner | vitest | Native ESM, fast, TS out of the box |
-| API mocking | msw 2.x | Network-level interception |
-| Dev | tsx | Fast TS execution, watch mode |
-| Build (server) | tsup | Simple bundling for npm publish |
+| Layer          | Choice                   | Why                                    |
+| -------------- | ------------------------ | -------------------------------------- |
+| Runtime        | Node.js 20+              | ESM support                            |
+| Language       | TypeScript (strict, ESM) | `"type": "module"` in package.json     |
+| Server         | Express 5                | Mature, well-known                     |
+| Frontend       | Vue 3 (Composition API)  | Reactive UI, component model           |
+| Routing        | vue-router               | SPA navigation (dashboard, settings)   |
+| Build (client) | Vite                     | Fast dev server + production bundling  |
+| Styling        | Custom CSS               | Hand-written, CSS variables, dark mode |
+| GitHub API     | @octokit/rest            | Official SDK, pagination, rate limits  |
+| Concurrency    | p-limit                  | Cap parallel API calls (~10)           |
+| YAML parsing   | yaml                     | For workflow_dispatch inputs           |
+| Config         | XDG/APPDATA + fs         | No dependency — see Config section     |
+| Test runner    | vitest                   | Native ESM, fast, TS out of the box    |
+| API mocking    | msw 2.x                  | Network-level interception             |
+| Dev            | tsx                      | Fast TS execution, watch mode          |
+| Build (server) | tsup                     | Simple bundling for npm publish        |
 
 ## Core Types
 
@@ -54,27 +54,27 @@ Shared context for all gha-dash TPPs. This is a reference doc, not a TPP.
 // src/types.ts
 
 export interface AppConfig {
-  repos: string[];          // "owner/repo" format; empty = show all
+  repos: string[]; // "owner/repo" format; empty = show all
   availableRepos: string[];
   branches: Record<string, string>;
   hiddenWorkflows: string[];
-  refreshInterval: number;  // seconds, default 3600
+  refreshInterval: number; // seconds, default 3600
   rateLimitFloor: number;
   rateBudgetPct: number;
-  port: number;             // default 3131
+  port: number; // default 3131
 }
 
 export interface WorkflowRun {
   workflowId: number;
   workflowName: string;
-  repo: string;             // "owner/repo"
+  repo: string; // "owner/repo"
   status: RunStatus;
   conclusion: RunConclusion | null;
   branch: string;
   commitSha: string;
   commitMessage: string;
-  duration: number;         // milliseconds
-  createdAt: string;        // ISO 8601
+  duration: number; // milliseconds
+  createdAt: string; // ISO 8601
   htmlUrl: string;
   workflowPath: string;
 }
@@ -90,26 +90,28 @@ export type RunConclusion =
 
 ## API Routes
 
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/api/workflows` | GET | Grouped workflow runs + errors + rate limit |
-| `/api/config` | GET | Current configuration |
-| `/api/config` | PUT | Update configuration, triggers refresh |
-| `/api/refresh` | POST | Refresh all repos, returns updated data |
-| `/api/refresh/:owner/:repo` | POST | Refresh single repo, returns updated data |
-| `/api/dispatch/:owner/:repo/:id` | GET | Dispatch form metadata (inputs, default branch) |
-| `/api/dispatch/:owner/:repo/:id` | POST | Trigger workflow dispatch |
+| Route                            | Method | Purpose                                         |
+| -------------------------------- | ------ | ----------------------------------------------- |
+| `/api/workflows`                 | GET    | Grouped workflow runs + errors + rate limit     |
+| `/api/config`                    | GET    | Current configuration                           |
+| `/api/config`                    | PUT    | Update configuration, triggers refresh          |
+| `/api/refresh`                   | POST   | Refresh all repos, returns updated data         |
+| `/api/refresh/:owner/:repo`      | POST   | Refresh single repo, returns updated data       |
+| `/api/dispatch/:owner/:repo/:id` | GET    | Dispatch form metadata (inputs, default branch) |
+| `/api/dispatch/:owner/:repo/:id` | POST   | Trigger workflow dispatch                       |
 
 ## Frontend Architecture
 
 Vue 3 SPA with Composition API (`<script setup lang="ts">`).
 
 ### Composables
+
 - `useWorkflows` — fetch/poll groups, refresh all/single repo
 - `useConfig` — fetch/save app configuration
 - `useDispatch` — load dispatch info, trigger dispatch
 
 ### Components
+
 - `AppHeader` — nav, rate limit badge, refresh button
 - `DashboardView` — error banner + workflow table
 - `WorkflowTable` — sort/filter as computed properties, collapse state
@@ -119,6 +121,7 @@ Vue 3 SPA with Composition API (`<script setup lang="ts">`).
 - `DispatchForm` — typed inputs, submit, success/error feedback
 
 ### Client-side state (reactive, not from API)
+
 - Collapse map — persisted to localStorage
 - Sort column/direction — computed sorting within repo groups
 - Search query, failures-only filter — computed filtering
@@ -132,9 +135,15 @@ import { join } from "node:path";
 
 function getConfigDir(): string {
   if (process.platform === "win32") {
-    return join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "gha-dash");
+    return join(
+      process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"),
+      "gha-dash",
+    );
   }
-  return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "gha-dash");
+  return join(
+    process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"),
+    "gha-dash",
+  );
 }
 ```
 

@@ -19,14 +19,21 @@ const emit = defineEmits<{
       placeholder="Search workflows..."
       aria-label="Search workflows"
       :value="searchQuery"
-      @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
-    >
+      @input="
+        emit('update:searchQuery', ($event.target as HTMLInputElement).value)
+      "
+    />
     <label class="filter-toggle">
       <input
         type="checkbox"
         :checked="failuresOnly"
-        @change="emit('update:failuresOnly', ($event.target as HTMLInputElement).checked)"
-      >
+        @change="
+          emit(
+            'update:failuresOnly',
+            ($event.target as HTMLInputElement).checked,
+          )
+        "
+      />
       Failures only
     </label>
     <div class="checkbox-helpers">

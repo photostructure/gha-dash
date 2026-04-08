@@ -20,6 +20,7 @@ Before any work, you MUST read these files (in order):
 3. [DESIGN-PRINCIPLES.md](../../../docs/DESIGN-PRINCIPLES.md) — Simple Design & Tidy First
 
 **Design Principles TL;DR:**
+
 - Four Rules (priority order): passes tests, reveals intention, no duplication, fewest elements
 - Fail early and visibly — no bogus guardrails or silent defaults
 - Keep tidyings in separate commits from behavior changes

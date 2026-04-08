@@ -1,7 +1,7 @@
+import { exec } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { exec } from "node:child_process";
 import { createApp } from "./server.js";
 import {
   initAppState,

@@ -63,19 +63,20 @@ Browser (Vue 3 SPA)              Express Server (unchanged)
 
 ## Tech Stack Changes
 
-| Remove | Add | Why |
-|--------|-----|-----|
-| EJS | Vue 3 (SFC) | Reactive UI, component model |
-| HTMX | fetch / composable | JSON API, no DOM swap fights |
-| Vanilla JS (dashboard.ejs) | Vue reactivity | Sort/filter/collapse as data |
-| — | Vite | Dev server + build |
-| — | vue-router | Dashboard / Settings pages |
+| Remove                     | Add                | Why                          |
+| -------------------------- | ------------------ | ---------------------------- |
+| EJS                        | Vue 3 (SFC)        | Reactive UI, component model |
+| HTMX                       | fetch / composable | JSON API, no DOM swap fights |
+| Vanilla JS (dashboard.ejs) | Vue reactivity     | Sort/filter/collapse as data |
+| —                          | Vite               | Dev server + build           |
+| —                          | vue-router         | Dashboard / Settings pages   |
 
 Keep: Express 4, @octokit/rest, p-limit, yaml, vitest, msw, supertest, tsup (for server build).
 
 ## Tasks
 
 ### 1. Add JSON API Endpoints
+
 - [x] `GET /api/workflows` — returns grouped workflow data as JSON
 - [x] `GET /api/config` — returns current config
 - [x] `PUT /api/config` — saves config (repos + general settings)
@@ -88,6 +89,7 @@ Keep: Express 4, @octokit/rest, p-limit, yaml, vitest, msw, supertest, tsup (for
 - [x] 6 API route tests added (64 total tests, all passing)
 
 ### 2. Vue 3 App Setup
+
 - [x] Add vite + vue 3 + vue-router + concurrently to package.json
 - [x] `src/client/` directory for Vue SPA
 - [x] Vite config: dev proxy to Express, build output to `dist/client/`
@@ -97,6 +99,7 @@ Keep: Express 4, @octokit/rest, p-limit, yaml, vitest, msw, supertest, tsup (for
 - [x] Vite + server builds both work (`npm run build`)
 
 ### 3. Dashboard Components
+
 - [x] `src/client/views/DashboardView.vue` — main dashboard
 - [x] `src/client/components/WorkflowTable.vue` — sort/filter as computed
 - [x] `src/client/components/RepoGroup.vue` — collapsible repo header
@@ -113,6 +116,7 @@ Keep: Express 4, @octokit/rest, p-limit, yaml, vitest, msw, supertest, tsup (for
 - [x] Per-repo + global refresh, state preserved
 
 ### 4. Settings Component
+
 - [x] `src/client/views/SettingsView.vue` — unified settings page
 - [x] Repo table with sortable columns (selected, owner, name)
 - [x] Client-side filter text field
@@ -121,12 +125,14 @@ Keep: Express 4, @octokit/rest, p-limit, yaml, vitest, msw, supertest, tsup (for
 - [x] Single save button posts JSON to PUT /api/config
 
 ### 5. Dispatch Component
+
 - [x] `src/client/components/DispatchForm.vue` — inline form
 - [x] Expands below workflow row (detail row pattern)
 - [x] Typed inputs from JSON dispatch info (string, choice, boolean)
 - [x] Submit + success/error feedback
 
 ### 6. Cleanup
+
 - [x] Remove EJS templates (`src/views/`)
 - [x] Remove HTMX (`src/public/htmx.min.js`)
 - [x] Remove EJS dependency
@@ -140,16 +146,19 @@ Keep: Express 4, @octokit/rest, p-limit, yaml, vitest, msw, supertest, tsup (for
 ## Key Design Decisions
 
 ### Client-Side Polling (not WebSocket)
+
 Keep simple `setInterval` + `fetch('/api/workflows')` polling. The backend
 already caches data — the client just re-fetches the JSON. No WebSocket
 complexity needed for a local dashboard.
 
 ### CSS
+
 Keep the existing `style.css` — it's already well-structured with CSS variables
 for dark mode. Vue components can import it globally. No need for Tailwind or
 CSS-in-JS.
 
 ### Build
+
 - **Dev**: Vite dev server proxies API requests to Express on :3131
 - **Prod**: `vite build` → `dist/client/`, Express serves as static files
 - Server still builds with `tsup` → `dist/cli.js`
@@ -194,6 +203,7 @@ CSS-in-JS.
 ## Uncommitted Changes
 
 There are 8 files with uncommitted changes from the end of the HTMX session:
+
 - Unified settings form (single POST /settings/all)
 - Rate limit partial with OOB swap attempt
 - Per-repo refresh changed to 204/hx-swap="none"

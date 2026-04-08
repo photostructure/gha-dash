@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { extractToken } from "../github.js";
 import { execSync } from "node:child_process";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { extractToken } from "../github.js";
 
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),

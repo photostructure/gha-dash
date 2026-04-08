@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { inject } from "vue";
-import type { useWorkflows } from "../composables/useWorkflows";
 import ErrorBanner from "../components/ErrorBanner.vue";
 import WorkflowTable from "../components/WorkflowTable.vue";
+import type { useWorkflows } from "../composables/useWorkflows";
 
 const workflows = inject<ReturnType<typeof useWorkflows>>("workflows")!;
 </script>

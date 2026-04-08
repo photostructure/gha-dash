@@ -19,7 +19,12 @@ const tooltip = computed(() => {
 </script>
 
 <template>
-  <span v-if="rateLimit" class="rate-limit-badge" :class="colorClass" :title="tooltip">
+  <span
+    v-if="rateLimit"
+    class="rate-limit-badge"
+    :class="colorClass"
+    :title="tooltip"
+  >
     API: {{ rateLimit.remaining }}/{{ rateLimit.limit }}
   </span>
 </template>

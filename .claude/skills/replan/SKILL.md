@@ -35,6 +35,7 @@ Design your first approach, considering requirements and existing solutions.
 Generate thorough critiques of your plan:
 
 **General engineering:**
+
 - Does it balance simplicity with good engineering?
 - Is it maintainable, testable, DRY, scalable?
 - Scrutinize for "hand-wavy" aspects - don't assume how things work, study the code
@@ -42,6 +43,7 @@ Generate thorough critiques of your plan:
 - Note uncertainties as risks
 
 **Project-specific concerns (gha-dash):**
+
 - **Dashboard performance**: Will this approach keep the dashboard responsive? Consider data fetching strategies, rendering performance, and caching.
 - **GitHub API efficiency**: Are we minimizing API calls? Are we respecting rate limits? Could we batch or cache requests?
 - **Data freshness vs. cost**: Are we striking the right balance between up-to-date data and API/compute costs?
@@ -88,6 +90,7 @@ For each iteration, present options with pros/cons:
 ## Design Principles (TL;DR of `docs/DESIGN-PRINCIPLES.md`)
 
 **Four Rules of Simple Design** (in priority order):
+
 1. **Passes the tests** — working code beats everything
 2. **Reveals intention** — clear names, structure matches the problem domain
 3. **No duplication** — eliminate repeated logic and knowledge
@@ -95,12 +98,14 @@ For each iteration, present options with pros/cons:
 5. **No bogus guardrails** — fail early and visibly; never silently swallow errors or invent defaults
 
 **Tidy First methodology:**
+
 - Small structural changes (guard clauses, explaining variables, extract helper, etc.) that don't alter behavior
 - Keep tidyings in **separate commits** from behavior changes
 - Tidy only enough to make the next behavior change easier — not a refactoring sprint
 - Reduce coupling; prefer explicit dependencies over hidden ones
 
 **When evaluating plans, watch for:**
+
 - Over-engineering and speculative abstractions (Rule 4)
 - Missing error handling strategy — should errors propagate or be caught? (Rule 5)
 - Hidden coupling between components

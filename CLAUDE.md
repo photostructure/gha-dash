@@ -139,6 +139,7 @@ Config tests stub both `XDG_CONFIG_HOME` and `APPDATA` for cross-platform.
 ## CI & Publishing
 
 `.github/workflows/build.yml`:
+
 - **Push/PR**: Build matrix (ubuntu/macos/windows × node 20/22/24)
 - **Manual dispatch**: Version bump, SSH-signed tag, GitHub release, npm publish
   with OIDC provenance. Requires secrets: `SSH_SIGNING_KEY`, `GIT_USER_NAME`,

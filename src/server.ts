@@ -1,7 +1,7 @@
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import express from "express";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { apiRoutes } from "./routes/api.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,7 +34,11 @@ export function createApp() {
   } else {
     // Dev mode: no built SPA
     app.get("/", (_req, res) => {
-      res.type("text").send("Run 'npm run dev' to start both Express and Vite, then open http://localhost:5173");
+      res
+        .type("text")
+        .send(
+          "Run 'npm run dev' to start both Express and Vite, then open http://localhost:5173",
+        );
     });
   }
 

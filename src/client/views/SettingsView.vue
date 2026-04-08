@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useConfig } from "../composables/useConfig";
 
@@ -44,8 +44,9 @@ const repoRows = computed(() => {
     return { full: r, owner, name, selected: selectedRepos.value.has(r) };
   });
   if (q) {
-    repos = repos.filter((r) =>
-      r.owner.toLowerCase().includes(q) || r.name.toLowerCase().includes(q),
+    repos = repos.filter(
+      (r) =>
+        r.owner.toLowerCase().includes(q) || r.name.toLowerCase().includes(q),
     );
   }
   repos.sort((a, b) => {
@@ -82,7 +83,8 @@ function sortClass(col: string): string {
 
 function toggleRepo(full: string) {
   const s = new Set(selectedRepos.value);
-  if (s.has(full)) s.delete(full); else s.add(full);
+  if (s.has(full)) s.delete(full);
+  else s.add(full);
   selectedRepos.value = s;
 }
 
@@ -101,7 +103,8 @@ function checkNone() {
 function checkInverse() {
   const s = new Set(selectedRepos.value);
   for (const r of repoRows.value) {
-    if (s.has(r.full)) s.delete(r.full); else s.add(r.full);
+    if (s.has(r.full)) s.delete(r.full);
+    else s.add(r.full);
   }
   selectedRepos.value = s;
 }
@@ -126,7 +129,12 @@ async function save() {
   <div class="settings">
     <div class="settings-header">
       <h2>Settings</h2>
-      <button type="button" class="btn btn-primary" :disabled="saving" @click="save">
+      <button
+        type="button"
+        class="btn btn-primary"
+        :disabled="saving"
+        @click="save"
+      >
         {{ saving ? "Saving..." : "Save" }}
       </button>
     </div>
@@ -137,7 +145,8 @@ async function save() {
     <template v-else-if="config">
       <details v-if="config.availableRepos.length > 0" open>
         <summary>
-          <strong>Repos</strong> &mdash; {{ selectedRepos.size }} of {{ config.availableRepos.length }} selected
+          <strong>Repos</strong> &mdash; {{ selectedRepos.size }} of
+          {{ config.availableRepos.length }} selected
         </summary>
         <div class="settings-section">
           <div class="toolbar">
@@ -146,7 +155,7 @@ async function save() {
               placeholder="Filter repos..."
               aria-label="Filter repos"
               v-model="repoFilter"
-            >
+            />
             <div class="checkbox-helpers">
               <button type="button" @click="checkAll">All</button>
               <button type="button" @click="checkNone">None</button>
@@ -156,15 +165,37 @@ async function save() {
           <table class="settings-table">
             <thead>
               <tr>
-                <th scope="col" :class="sortClass('selected')" @click="toggleSort('selected')">&#x2713;</th>
-                <th scope="col" :class="sortClass('owner')" @click="toggleSort('owner')">Owner</th>
-                <th scope="col" :class="sortClass('repo')" @click="toggleSort('repo')">Repo</th>
+                <th
+                  scope="col"
+                  :class="sortClass('selected')"
+                  @click="toggleSort('selected')"
+                >
+                  &#x2713;
+                </th>
+                <th
+                  scope="col"
+                  :class="sortClass('owner')"
+                  @click="toggleSort('owner')"
+                >
+                  Owner
+                </th>
+                <th
+                  scope="col"
+                  :class="sortClass('repo')"
+                  @click="toggleSort('repo')"
+                >
+                  Repo
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="r in repoRows" :key="r.full">
                 <td class="check-col">
-                  <input type="checkbox" :checked="r.selected" @change="toggleRepo(r.full)">
+                  <input
+                    type="checkbox"
+                    :checked="r.selected"
+                    @change="toggleRepo(r.full)"
+                  />
                 </td>
                 <td>{{ r.owner }}</td>
                 <td>{{ r.name }}</td>
@@ -173,34 +204,66 @@ async function save() {
           </table>
         </div>
       </details>
-      <p v-else class="hint">No repos discovered yet &mdash; refresh the dashboard first.</p>
+      <p v-else class="hint">
+        No repos discovered yet &mdash; refresh the dashboard first.
+      </p>
 
       <details open>
         <summary><strong>General</strong></summary>
         <div class="settings-section config-form">
           <div class="form-field">
             <label for="refreshInterval">Refresh interval (seconds)</label>
-            <input type="number" id="refreshInterval" v-model.number="refreshInterval" min="60">
+            <input
+              type="number"
+              id="refreshInterval"
+              v-model.number="refreshInterval"
+              min="60"
+            />
           </div>
           <div class="form-field">
             <label for="rateLimitFloor">Rate limit floor</label>
-            <input type="number" id="rateLimitFloor" v-model.number="rateLimitFloor" min="0">
-            <small class="field-help">Stop refreshing when remaining API calls drop below this number.</small>
+            <input
+              type="number"
+              id="rateLimitFloor"
+              v-model.number="rateLimitFloor"
+              min="0"
+            />
+            <small class="field-help"
+              >Stop refreshing when remaining API calls drop below this
+              number.</small
+            >
           </div>
           <div class="form-field">
             <label for="rateBudgetPct">Rate budget per cycle (%)</label>
-            <input type="number" id="rateBudgetPct" v-model.number="rateBudgetPct" min="1" max="100">
-            <small class="field-help">Max percentage of rate limit to use per refresh cycle.</small>
+            <input
+              type="number"
+              id="rateBudgetPct"
+              v-model.number="rateBudgetPct"
+              min="1"
+              max="100"
+            />
+            <small class="field-help"
+              >Max percentage of rate limit to use per refresh cycle.</small
+            >
           </div>
           <div class="form-field">
             <label for="port">Port</label>
-            <input type="number" id="port" v-model.number="port" min="1" max="65535">
+            <input
+              type="number"
+              id="port"
+              v-model.number="port"
+              min="1"
+              max="65535"
+            />
             <small class="field-help">Takes effect on next restart.</small>
           </div>
           <div class="form-field">
             <label for="hiddenWorkflows">Hidden workflows</label>
-            <input type="text" id="hiddenWorkflows" v-model="hiddenWorkflows">
-            <small class="field-help">Comma-separated. Hides workflows whose name contains any of these (case-insensitive).</small>
+            <input type="text" id="hiddenWorkflows" v-model="hiddenWorkflows" />
+            <small class="field-help"
+              >Comma-separated. Hides workflows whose name contains any of these
+              (case-insensitive).</small
+            >
           </div>
         </div>
       </details>

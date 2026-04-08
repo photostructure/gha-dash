@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
+import type { RateLimitInfo } from "../composables/useWorkflows";
 import RateLimitBadge from "./RateLimitBadge.vue";
 import RefreshIcon from "./RefreshIcon.vue";
-import type { RateLimitInfo } from "../composables/useWorkflows";
 
 defineProps<{
   rateLimit?: RateLimitInfo | null;

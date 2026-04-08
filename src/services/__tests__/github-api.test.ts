@@ -1,8 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { Octokit } from "@octokit/rest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { Octokit } from "@octokit/rest";
-import { fetchWorkflowRuns, fetchRepoMeta, fetchActiveWorkflowIds } from "../github.js";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  fetchActiveWorkflowIds,
+  fetchRepoMeta,
+  fetchWorkflowRuns,
+} from "../github.js";
 
 const server = setupServer();
 
@@ -71,21 +75,18 @@ describe("fetchWorkflowRuns", () => {
 
   it("deduplicates completed runs by workflow_id (keeps latest per workflow)", async () => {
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () => {
-          return HttpResponse.json({
-            total_count: 3,
-            workflow_runs: [
-              // Two runs for same workflow — only newest should be kept
-              makeRun(3, 100, "main", now),
-              makeRun(2, 100, "feature", oneHourAgo),
-              // Different workflow — should be kept
-              makeRun(1, 200, "main", oneHourAgo),
-            ],
-          });
-        },
-      ),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
+        return HttpResponse.json({
+          total_count: 3,
+          workflow_runs: [
+            // Two runs for same workflow — only newest should be kept
+            makeRun(3, 100, "main", now),
+            makeRun(2, 100, "feature", oneHourAgo),
+            // Different workflow — should be kept
+            makeRun(1, 200, "main", oneHourAgo),
+          ],
+        });
+      }),
     );
 
     const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
@@ -98,22 +99,24 @@ describe("fetchWorkflowRuns", () => {
 
   it("filters out deleted workflows when activeWorkflowIds provided", async () => {
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () => {
-          return HttpResponse.json({
-            total_count: 2,
-            workflow_runs: [
-              makeRun(2, 100, "main", now),
-              makeRun(1, 999, "main", oneHourAgo), // deleted workflow
-            ],
-          });
-        },
-      ),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
+        return HttpResponse.json({
+          total_count: 2,
+          workflow_runs: [
+            makeRun(2, 100, "main", now),
+            makeRun(1, 999, "main", oneHourAgo), // deleted workflow
+          ],
+        });
+      }),
     );
 
     const activeIds = new Set([100]); // 999 is deleted
-    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo", activeIds);
+    const runs = await fetchWorkflowRuns(
+      makeOctokit(),
+      "owner",
+      "repo",
+      activeIds,
+    );
 
     expect(runs).toHaveLength(1);
     expect(runs[0].workflowId).toBe(100);
@@ -121,18 +124,15 @@ describe("fetchWorkflowRuns", () => {
 
   it("keeps old runs (no lookback filter — latest per workflow)", async () => {
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () => {
-          return HttpResponse.json({
-            total_count: 2,
-            workflow_runs: [
-              makeRun(2, 100, "main", twoDaysAgo),
-              makeRun(1, 200, "main", tenDaysAgo),
-            ],
-          });
-        },
-      ),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
+        return HttpResponse.json({
+          total_count: 2,
+          workflow_runs: [
+            makeRun(2, 100, "main", twoDaysAgo),
+            makeRun(1, 200, "main", tenDaysAgo),
+          ],
+        });
+      }),
     );
 
     const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
@@ -143,42 +143,49 @@ describe("fetchWorkflowRuns", () => {
 
   it("keeps all active runs even for the same workflow", async () => {
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () => {
-          return HttpResponse.json({
-            total_count: 4,
-            workflow_runs: [
-              makeRun(4, 100, "feature-b", now, { status: "in_progress", conclusion: null }),
-              makeRun(3, 100, "feature-a", oneHourAgo, { status: "queued", conclusion: null }),
-              makeRun(2, 100, "main", twoDaysAgo), // completed — kept (latest)
-              makeRun(1, 100, "main", tenDaysAgo), // completed — dropped (already have one)
-            ],
-          });
-        },
-      ),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
+        return HttpResponse.json({
+          total_count: 4,
+          workflow_runs: [
+            makeRun(4, 100, "feature-b", now, {
+              status: "in_progress",
+              conclusion: null,
+            }),
+            makeRun(3, 100, "feature-a", oneHourAgo, {
+              status: "queued",
+              conclusion: null,
+            }),
+            makeRun(2, 100, "main", twoDaysAgo), // completed — kept (latest)
+            makeRun(1, 100, "main", tenDaysAgo), // completed — dropped (already have one)
+          ],
+        });
+      }),
     );
 
     const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
 
     expect(runs).toHaveLength(3);
-    expect(runs.map((r) => r.branch).sort()).toEqual(["feature-a", "feature-b", "main"]);
+    expect(runs.map((r) => r.branch).sort()).toEqual([
+      "feature-a",
+      "feature-b",
+      "main",
+    ]);
   });
 
   it("keeps runs with pending status", async () => {
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () => {
-          return HttpResponse.json({
-            total_count: 2,
-            workflow_runs: [
-              makeRun(2, 100, "main", now, { status: "pending", conclusion: null }),
-              makeRun(1, 100, "main", oneHourAgo), // completed
-            ],
-          });
-        },
-      ),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
+        return HttpResponse.json({
+          total_count: 2,
+          workflow_runs: [
+            makeRun(2, 100, "main", now, {
+              status: "pending",
+              conclusion: null,
+            }),
+            makeRun(1, 100, "main", oneHourAgo), // completed
+          ],
+        });
+      }),
     );
 
     const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
@@ -190,21 +197,24 @@ describe("fetchWorkflowRuns", () => {
 
   it("keeps all active runs across multiple workflows plus latest completed", async () => {
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () => {
-          return HttpResponse.json({
-            total_count: 5,
-            workflow_runs: [
-              makeRun(5, 100, "main", now, { status: "in_progress", conclusion: null }),
-              makeRun(4, 200, "main", now, { status: "waiting", conclusion: null }),
-              makeRun(3, 100, "main", oneHourAgo),    // completed — kept (latest for wf 100)
-              makeRun(2, 200, "main", oneHourAgo),    // completed — kept (latest for wf 200)
-              makeRun(1, 100, "develop", twoDaysAgo), // completed — dropped (wf 100 already has one)
-            ],
-          });
-        },
-      ),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
+        return HttpResponse.json({
+          total_count: 5,
+          workflow_runs: [
+            makeRun(5, 100, "main", now, {
+              status: "in_progress",
+              conclusion: null,
+            }),
+            makeRun(4, 200, "main", now, {
+              status: "waiting",
+              conclusion: null,
+            }),
+            makeRun(3, 100, "main", oneHourAgo), // completed — kept (latest for wf 100)
+            makeRun(2, 200, "main", oneHourAgo), // completed — kept (latest for wf 200)
+            makeRun(1, 100, "develop", twoDaysAgo), // completed — dropped (wf 100 already has one)
+          ],
+        });
+      }),
     );
 
     const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
@@ -217,20 +227,17 @@ describe("fetchWorkflowRuns", () => {
     const end = new Date("2026-01-01T10:05:00Z"); // 5 minutes later
 
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () => {
-          return HttpResponse.json({
-            total_count: 1,
-            workflow_runs: [
-              makeRun(1, 100, "main", start, {
-                updated_at: end.toISOString(),
-                run_started_at: start.toISOString(),
-              }),
-            ],
-          });
-        },
-      ),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
+        return HttpResponse.json({
+          total_count: 1,
+          workflow_runs: [
+            makeRun(1, 100, "main", start, {
+              updated_at: end.toISOString(),
+              run_started_at: start.toISOString(),
+            }),
+          ],
+        });
+      }),
     );
 
     const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
@@ -248,9 +255,24 @@ describe("fetchActiveWorkflowIds", () => {
           return HttpResponse.json({
             total_count: 3,
             workflows: [
-              { id: 100, name: "CI", path: ".github/workflows/ci.yml", state: "active" },
-              { id: 200, name: "Deploy", path: ".github/workflows/deploy.yml", state: "active" },
-              { id: 300, name: "Old Security", path: ".github/workflows/security.yml", state: "deleted" },
+              {
+                id: 100,
+                name: "CI",
+                path: ".github/workflows/ci.yml",
+                state: "active",
+              },
+              {
+                id: 200,
+                name: "Deploy",
+                path: ".github/workflows/deploy.yml",
+                state: "active",
+              },
+              {
+                id: 300,
+                name: "Old Security",
+                path: ".github/workflows/security.yml",
+                state: "deleted",
+              },
             ],
           });
         },

@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import type { WorkflowRun } from "../../types.js";
 
 export interface RepoStats {

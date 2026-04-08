@@ -19,6 +19,16 @@ provide("workflows", workflows);
     <router-view />
   </main>
   <footer class="app-footer">
-    An <a href="https://github.com/photostructure/gha-dash" target="_blank" rel="noopener">open source</a> project by <a href="https://photostructure.com" target="_blank" rel="noopener">PhotoStructure, Inc.</a>
+    An
+    <a
+      href="https://github.com/photostructure/gha-dash"
+      target="_blank"
+      rel="noopener"
+      >open source</a
+    >
+    project by
+    <a href="https://photostructure.com" target="_blank" rel="noopener"
+      >PhotoStructure, Inc.</a
+    >
   </footer>
 </template>

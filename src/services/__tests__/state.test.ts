@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { Cache } from "../cache.js";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { WorkflowRun } from "../../types.js";
+import { Cache } from "../cache.js";
 
 const mockRun = (repo: string, workflowName: string): WorkflowRun => ({
   workflowId: 1,

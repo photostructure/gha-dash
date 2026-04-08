@@ -38,7 +38,12 @@ export interface WorkflowRun {
   startedAt: string; // ISO 8601 — run_started_at ?? created_at
 }
 
-export type RunStatus = "completed" | "in_progress" | "queued" | "waiting" | "pending";
+export type RunStatus =
+  | "completed"
+  | "in_progress"
+  | "queued"
+  | "waiting"
+  | "pending";
 export type RunConclusion =
   | "success"
   | "failure"

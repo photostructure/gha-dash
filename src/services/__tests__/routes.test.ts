@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowRun } from "../../types.js";
 import { Cache } from "../cache.js";
 
@@ -32,11 +32,22 @@ const mockStateEvents = new EventEmitter();
 
 vi.mock("../../state.js", () => ({
   getAppState: () => ({
-    config: { repos: ["owner/repo"], availableRepos: ["owner/repo", "owner/other"], branches: {}, hiddenWorkflows: [], refreshInterval: 60, rateLimitFloor: 500, rateBudgetPct: 50, port: 3131 },
+    config: {
+      repos: ["owner/repo"],
+      availableRepos: ["owner/repo", "owner/other"],
+      branches: {},
+      hiddenWorkflows: [],
+      refreshInterval: 60,
+      rateLimitFloor: 500,
+      rateBudgetPct: 50,
+      port: 3131,
+    },
     octokit: {},
     username: "testuser",
     cache,
-    repoStats: new Map([["owner/repo", { openPrs: 2, openIssues: 3, canPush: true }]]),
+    repoStats: new Map([
+      ["owner/repo", { openPrs: 2, openIssues: 3, canPush: true }],
+    ]),
     rateLimit: { remaining: 4999, limit: 5000, checkedAt: new Date() },
   }),
   refreshing: false,

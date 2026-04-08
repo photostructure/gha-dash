@@ -1,5 +1,5 @@
-import { parse as parseYaml } from "yaml";
 import type { Octokit } from "@octokit/rest";
+import { parse as parseYaml } from "yaml";
 import type { DispatchInput, WorkflowDispatchInfo } from "../types.js";
 import { Cache } from "./cache.js";
 
@@ -94,21 +94,25 @@ export function parseWorkflowDispatch(
     if (wd === undefined) return null;
 
     // on: { workflow_dispatch: null } or { workflow_dispatch: {} }
-    if (!wd || typeof wd !== "object" || !(wd as Record<string, unknown>).inputs) {
+    if (
+      !wd ||
+      typeof wd !== "object" ||
+      !(wd as Record<string, unknown>).inputs
+    ) {
       return { workflowId, workflowName, inputs: [] };
     }
 
     // on: { workflow_dispatch: { inputs: { ... } } }
-    const inputs = parseInputs((wd as Record<string, unknown>).inputs as Record<string, unknown>);
+    const inputs = parseInputs(
+      (wd as Record<string, unknown>).inputs as Record<string, unknown>,
+    );
     return { workflowId, workflowName, inputs };
   }
 
   return null;
 }
 
-function parseInputs(
-  rawInputs: Record<string, unknown>,
-): DispatchInput[] {
+function parseInputs(rawInputs: Record<string, unknown>): DispatchInput[] {
   return Object.entries(rawInputs).map(([name, def]) => {
     const d = (def ?? {}) as Record<string, unknown>;
     return {
@@ -117,16 +121,12 @@ function parseInputs(
       description: String(d.description ?? ""),
       required: Boolean(d.required),
       default: String(d.default ?? ""),
-      options: Array.isArray(d.options)
-        ? d.options.map(String)
-        : [],
+      options: Array.isArray(d.options) ? d.options.map(String) : [],
     };
   });
 }
 
-function normalizeType(
-  t: string | undefined,
-): DispatchInput["type"] {
+function normalizeType(t: string | undefined): DispatchInput["type"] {
   if (t === "choice" || t === "boolean" || t === "environment") return t;
   return "string";
 }

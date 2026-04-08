@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type AppConfig, type CacheEntry, defaultConfig } from "../types.js";
@@ -43,7 +43,10 @@ export async function writeConfig(config: AppConfig): Promise<void> {
   await writeFile(configPath(), JSON.stringify(config, null, 2) + "\n");
 }
 
-export async function readCacheFromDisk<T>(): Promise<Map<string, CacheEntry<T>> | null> {
+export async function readCacheFromDisk<T>(): Promise<Map<
+  string,
+  CacheEntry<T>
+> | null> {
   try {
     const raw = await readFile(cachePath(), "utf-8");
     const entries: Array<[string, CacheEntry<T>]> = JSON.parse(raw);

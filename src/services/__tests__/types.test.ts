@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { formatDuration, relativeTime, displayStatus } from "../../types.js";
+import { describe, expect, it } from "vitest";
 import type { WorkflowRun } from "../../types.js";
+import { displayStatus, formatDuration, relativeTime } from "../../types.js";
 
 describe("formatDuration", () => {
   it("formats seconds only", () => {
