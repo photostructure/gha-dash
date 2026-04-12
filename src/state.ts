@@ -2,6 +2,7 @@ import type { Octokit } from "@octokit/rest";
 import { EventEmitter } from "node:events";
 import { Cache } from "./services/cache.js";
 import { readConfig, writeConfig } from "./services/config.js";
+import { EtagCache, installEtagHook } from "./services/etagCache.js";
 import type { RepoStats } from "./services/github.js";
 import {
   createOctokit,
@@ -23,9 +24,16 @@ import type { AppConfig, WorkflowRun } from "./types.js";
 export interface AppState {
   config: AppConfig;
   octokit: Octokit;
+  etagCache: EtagCache;
   username: string;
   cache: Cache<WorkflowRun[]>;
   repoStats: Map<string, RepoStats>;
+  /**
+   * Active (non-deleted) workflow IDs per repo, captured during the most
+   * recent full refresh. Used by refreshRepoActive() to filter out runs for
+   * deleted workflows without re-fetching the workflow list every poll.
+   */
+  workflowIds: Map<string, Set<number>>;
   rateLimit: { remaining: number; limit: number; checkedAt: Date } | null;
 }
 
@@ -47,6 +55,8 @@ export function getAppState(): AppState {
 export async function initAppState(): Promise<AppState> {
   const token = extractToken();
   const octokit = createOctokit(token);
+  const etagCache = new EtagCache();
+  installEtagHook(octokit, etagCache);
 
   const { data: user } = await octokit.users.getAuthenticated();
   const config = await readConfig();
@@ -68,9 +78,11 @@ export async function initAppState(): Promise<AppState> {
   state = {
     config,
     octokit,
+    etagCache,
     username: user.login,
     cache,
     repoStats: new Map(),
+    workflowIds: new Map(),
     rateLimit: null,
   };
 
@@ -140,12 +152,13 @@ async function doRefresh(): Promise<void> {
     // Calculate how many repos we can afford to refresh this cycle
     const maxRepos = computeBudget(state, repos.length);
 
-    const { runs, stats, errors, discoveredBranches } = await fetchAllRuns(
-      state.octokit,
-      repos,
-      state.config.branches,
-      maxRepos,
-    );
+    const { runs, stats, errors, discoveredBranches, workflowIds } =
+      await fetchAllRuns(
+        state.octokit,
+        repos,
+        state.config.branches,
+        maxRepos,
+      );
 
     for (const [repo, repoRuns] of runs) {
       if (repoRuns.length > 0) {
@@ -155,6 +168,12 @@ async function doRefresh(): Promise<void> {
 
     for (const [repo, repoStats] of stats) {
       state.repoStats.set(repo, repoStats);
+    }
+
+    // Capture active workflow IDs so refreshRepoActive can filter deleted
+    // workflows without re-fetching the workflow list every active poll.
+    for (const [repo, ids] of workflowIds) {
+      state.workflowIds.set(repo, ids);
     }
 
     for (const [repo, message] of errors) {
@@ -201,8 +220,10 @@ async function doRefresh(): Promise<void> {
         ...(await fetchRateLimit(state.octokit)),
         checkedAt: new Date(),
       };
+      const noEtag = state.etagCache.noEtagResponses();
+      const noEtagSuffix = noEtag > 0 ? ` (${noEtag} without etag!)` : "";
       console.log(
-        `Refreshed ${runs.size} repos. API: ${state.rateLimit.remaining}/${state.rateLimit.limit} remaining`,
+        `Refreshed ${runs.size} repos. API: ${state.rateLimit.remaining}/${state.rateLimit.limit} remaining. ETag cache: ${state.etagCache.hits()} hits / ${state.etagCache.misses()} misses${noEtagSuffix} (${state.etagCache.size()} entries)`,
       );
     } catch {
       // Non-critical
@@ -213,6 +234,7 @@ async function doRefresh(): Promise<void> {
       try {
         const newToken = extractToken();
         state.octokit = createOctokit(newToken);
+        installEtagHook(state.octokit, state.etagCache);
         console.log("Re-extracted GitHub token after 401");
       } catch {
         console.error(
@@ -312,7 +334,7 @@ function scheduleActiveRefresh(): void {
   refreshTimeout = setTimeout(async () => {
     for (const repo of activeRepos) {
       if (refreshing) break; // full refresh took over — bail out
-      await refreshRepo(repo);
+      await refreshRepoActive(repo);
     }
     if (!refreshing) {
       stateEvents.emit("refreshed");
@@ -364,6 +386,7 @@ export async function refreshRepo(fullName: string): Promise<void> {
       ),
     ]);
     state.repoStats.set(fullName, repoStats);
+    state.workflowIds.set(fullName, activeIds);
 
     const runs = await fetchWorkflowRuns(state.octokit, owner, repo, activeIds);
 
@@ -390,6 +413,52 @@ export async function refreshRepo(fullName: string): Promise<void> {
   }
 }
 
+/**
+ * Targeted active-poll refresh for a single repo. Only fetches workflow runs
+ * — skips repo metadata, workflow list, and PR/issue stats since none of
+ * those change at the active-poll cadence (every ~15s while a run is in
+ * flight). Drops 4 API calls per repo to 1 vs. refreshRepo().
+ *
+ * Uses state.workflowIds (captured during the most recent full refresh) to
+ * filter out runs for deleted workflows. If a repo has no cached workflowIds
+ * yet (e.g. process restart before first full refresh completed), the filter
+ * is skipped — deleted workflows could appear in the result for one cycle.
+ */
+export async function refreshRepoActive(fullName: string): Promise<void> {
+  if (!state) return;
+
+  const [owner, repo] = fullName.split("/");
+  const cachedIds = state.workflowIds.get(fullName);
+
+  try {
+    const runs = await fetchWorkflowRuns(
+      state.octokit,
+      owner,
+      repo,
+      cachedIds,
+    );
+
+    if (runs.length > 0) {
+      state.cache.set(fullName, runs);
+      await state.cache.saveToDisk();
+
+      const completed = runs.filter(
+        (r) => r.status === "completed" && r.duration > 0,
+      );
+      const updatedDurations = updateDurationHistory(
+        state.config.workflowDurations,
+        completed,
+      );
+      if (updatedDurations) {
+        state.config.workflowDurations = updatedDurations;
+        await writeConfig(state.config);
+      }
+    }
+  } catch (err) {
+    state.cache.setError(fullName, (err as Error).message);
+  }
+}
+
 export function stopBackgroundRefresh(): void {
   if (refreshTimeout) {
     clearTimeout(refreshTimeout);
@@ -399,6 +468,15 @@ export function stopBackgroundRefresh(): void {
     clearTimeout(fullRefreshTimeout);
     fullRefreshTimeout = null;
   }
+}
+
+/**
+ * TEST ONLY — replace the module-private state. Lets tests construct an
+ * AppState directly and exercise refresh functions without going through the
+ * full initAppState flow (which requires a real `gh` CLI). Pass null to clear.
+ */
+export function __setStateForTests(s: AppState | null): void {
+  state = s;
 }
 
 export async function updateConfig(updates: Partial<AppConfig>): Promise<void> {

@@ -2,6 +2,7 @@ import { Octokit } from "@octokit/rest";
 import { execSync } from "node:child_process";
 import pLimit from "p-limit";
 import type { WorkflowRun } from "../types.js";
+import { SKIP_ETAG_CACHE_HEADER } from "./etagCache.js";
 
 const API_CONCURRENCY = 10;
 
@@ -97,11 +98,17 @@ export async function fetchRepoStats(
 ): Promise<RepoStats> {
   // GitHub's open_issues_count includes PRs. Fetch open PR count
   // with per_page=1 and read the Link header for the real total.
+  //
+  // GitHub's ETag for `pulls.list` only hashes the visible body (the
+  // newest PR), not the full list state. If we cached the response and
+  // closed older PRs, we'd get a 304 and the cached Link header would
+  // report the stale total. Skip ETag caching here to keep counts fresh.
   const resp = await octokit.pulls.list({
     owner,
     repo,
     state: "open",
     per_page: 1,
+    headers: { [SKIP_ETAG_CACHE_HEADER]: "1" },
   });
 
   let openPrs = resp.data.length;
@@ -221,6 +228,12 @@ export interface FetchResult {
   errors: Map<string, string>;
   /** Branches discovered during this fetch (to persist to config) */
   discoveredBranches: Record<string, string>;
+  /**
+   * Active workflow IDs per repo. Captured during the full refresh so that
+   * subsequent active polls (refreshRepoActive) can filter out runs for
+   * deleted workflows without re-fetching the workflow list.
+   */
+  workflowIds: Map<string, Set<number>>;
 }
 
 /**
@@ -240,6 +253,7 @@ export async function fetchAllRuns(
   const stats = new Map<string, RepoStats>();
   const errors = new Map<string, string>();
   const discoveredBranches: Record<string, string> = {};
+  const workflowIds = new Map<string, Set<number>>();
 
   // If budget-limited, take a subset. Rotate by using a time-based offset
   // so different repos get refreshed each cycle.
@@ -281,6 +295,7 @@ export async function fetchAllRuns(
           );
           runs.set(fullName, result);
           stats.set(fullName, repoStats);
+          workflowIds.set(fullName, activeIds);
         } catch (err) {
           errors.set(fullName, (err as Error).message);
         }
@@ -288,12 +303,19 @@ export async function fetchAllRuns(
     ),
   );
 
-  return { runs, stats, errors, discoveredBranches };
+  return { runs, stats, errors, discoveredBranches, workflowIds };
 }
 
 export async function fetchRateLimit(
   octokit: Octokit,
 ): Promise<{ remaining: number; limit: number }> {
-  const { data } = await octokit.rateLimit.get();
+  // GitHub sends `Cache-Control: no-cache` and no ETag on /rate_limit (the
+  // body is volatile by definition). Skip the ETag cache so this doesn't
+  // pollute the noEtagResponses counter or attempt to cache an uncacheable
+  // response. /rate_limit is also exempt from quota, so caching would be
+  // pointless even if it were possible.
+  const { data } = await octokit.rateLimit.get({
+    headers: { [SKIP_ETAG_CACHE_HEADER]: "1" },
+  });
   return { remaining: data.rate.remaining, limit: data.rate.limit };
 }
