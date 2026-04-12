@@ -1,6 +1,6 @@
 {
   "name": "gha-dash",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "GitHub Actions dashboard — workflow status across multiple orgs/accounts",
   "type": "module",
   "bin": {
