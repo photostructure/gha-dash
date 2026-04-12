@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.7.0 (2026-04-12)
+
+### Features
+
+- **ETag conditional requests** — cache GitHub API ETags so unchanged
+  responses return 304 Not Modified, which GitHub doesn't count against
+  your rate limit. Steady-state full refreshes now consume near-zero
+  quota (100% hit rate observed in production with 17 repos)
+- **Lightweight active polling** — when workflows are in progress, the
+  15-second active poll now calls only the workflow runs endpoint (1 API
+  call per repo) instead of the full 4-call suite (repo metadata,
+  workflow list, PR stats, and runs). Cached workflow IDs from the most
+  recent full refresh are used to filter deleted workflows
+- **ETag health in refresh log** — the post-refresh log line now reports
+  `ETag cache: N hits / M misses (K entries)` so operators can monitor
+  cache effectiveness. A `(N without etag!)` suffix appears if any
+  responses arrive without ETag headers, surfacing silent degradation
+  from upstream proxies
+
+### Fixes
+
+- **Stale PR counts from cached Link headers** — `pulls.list` ETag only
+  hashes the visible response body, not the full list state, so closing
+  PRs not on the first page wouldn't invalidate the cache. PR count
+  requests now bypass ETag caching entirely
+- **`/rate_limit` false alarm** — GitHub sends `Cache-Control: no-cache`
+  and no ETag on `/rate_limit`, which inflated the "without etag" counter.
+  Rate limit requests now skip the cache since the endpoint is exempt
+  from quota anyway
+
 ## 0.6.0 (2026-04-07)
 
 ### Features
