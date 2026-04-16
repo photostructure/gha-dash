@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.0 (2026-04-15)
+
+### Features
+
+- **Live-updating duration** — the Duration column now ticks every second
+  for in-progress runs, so you can see elapsed time grow without waiting
+  for the next poll. Completed runs still use the stable server-computed
+  value
+- **Animated in-progress status** — `in_progress` runs render as a rotating
+  spinner (matching GitHub's style) in both status badges and collapsed
+  status dots, so activity is visible at a glance
+- **Repo link pill in header** — each repo group header now shows a pill
+  linking to the repo on GitHub, alongside the existing PR and issues
+  pills. Renders immediately, before stats load
+
+### Fixes
+
+- **Stale dashboard when runs transition** — GitHub's runs endpoint was
+  observed returning 304 while a run's status actually changed (e.g.
+  queued → in_progress), leaving the dashboard frozen on old state.
+  Full-refresh now bypasses ETag caching for repos with active runs;
+  idle repos keep their 304 quota savings
+- **Crash on first run before bundle extracts** — hitting the server
+  while `npx gha-dash` was still extracting the Vue bundle produced an
+  unhandled `NotFoundError`. Missing SPA files now return a quiet 503
+  so the error is recoverable
+
 ## 0.7.0 (2026-04-12)
 
 ### Features
