@@ -156,11 +156,22 @@ export async function fetchWorkflowRuns(
   owner: string,
   repo: string,
   activeWorkflowIds?: Set<number>,
+  opts?: { skipEtagCache?: boolean },
 ): Promise<WorkflowRun[]> {
+  // Observed in production: conditional requests against this endpoint can
+  // return 304 while an individual run's status has actually changed on
+  // GitHub (e.g. queued → in_progress), so the dashboard stays stale for the
+  // lifetime of the run. Root cause unclear — could be coarse ETag generation
+  // upstream, a CDN edge serving a stale ETag, or something else. Either way,
+  // callers that must see ground truth (active-run polling, manual refresh)
+  // opt out via SKIP_ETAG_CACHE_HEADER so no If-None-Match is sent.
   const { data } = await octokit.actions.listWorkflowRunsForRepo({
     owner,
     repo,
     per_page: 100,
+    ...(opts?.skipEtagCache
+      ? { headers: { [SKIP_ETAG_CACHE_HEADER]: "1" } }
+      : {}),
   });
 
   // Keep all active runs + latest completed run per workflow.
@@ -247,6 +258,13 @@ export async function fetchAllRuns(
   repos: string[],
   cachedBranches: Record<string, string>,
   maxRepos?: number,
+  /**
+   * Repos currently believed to have active (queued/in_progress/…) runs.
+   * For these, the runs fetch bypasses the ETag cache so we always see ground
+   * truth instead of a 304 that would overwrite fresher active-refresh data
+   * with stale cache body.
+   */
+  activeRepos?: Set<string>,
 ): Promise<FetchResult> {
   const limit = pLimit(API_CONCURRENCY);
   const runs = new Map<string, WorkflowRun[]>();
@@ -292,6 +310,7 @@ export async function fetchAllRuns(
             owner,
             repo,
             activeIds,
+            { skipEtagCache: activeRepos?.has(fullName) ?? false },
           );
           runs.set(fullName, result);
           stats.set(fullName, repoStats);

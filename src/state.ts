@@ -16,6 +16,7 @@ import {
   fetchWorkflowRuns,
 } from "./services/github.js";
 import {
+  ACTIVE_STATUSES,
   computeNextRefresh,
   updateDurationHistory,
 } from "./services/scheduler.js";
@@ -152,12 +153,24 @@ async function doRefresh(): Promise<void> {
     // Calculate how many repos we can afford to refresh this cycle
     const maxRepos = computeBudget(state, repos.length);
 
+    // Repos whose cached state currently shows an active run. For these, the
+    // full refresh must bypass the ETag cache on the runs endpoint — GitHub
+    // can return 304 even while status transitioned, and a 304-sourced cache
+    // body would clobber fresher data written by refreshRepoActive.
+    const activeRepos = new Set<string>();
+    for (const [repo, entry] of state.cache.entries()) {
+      if (entry.data.some((r) => ACTIVE_STATUSES.has(r.status))) {
+        activeRepos.add(repo);
+      }
+    }
+
     const { runs, stats, errors, discoveredBranches, workflowIds } =
       await fetchAllRuns(
         state.octokit,
         repos,
         state.config.branches,
         maxRepos,
+        activeRepos,
       );
 
     for (const [repo, repoRuns] of runs) {
@@ -388,7 +401,15 @@ export async function refreshRepo(fullName: string): Promise<void> {
     state.repoStats.set(fullName, repoStats);
     state.workflowIds.set(fullName, activeIds);
 
-    const runs = await fetchWorkflowRuns(state.octokit, owner, repo, activeIds);
+    const runs = await fetchWorkflowRuns(
+      state.octokit,
+      owner,
+      repo,
+      activeIds,
+      {
+        skipEtagCache: true,
+      },
+    );
 
     if (runs.length > 0) {
       state.cache.set(fullName, runs);
@@ -436,6 +457,7 @@ export async function refreshRepoActive(fullName: string): Promise<void> {
       owner,
       repo,
       cachedIds,
+      { skipEtagCache: true },
     );
 
     if (runs.length > 0) {

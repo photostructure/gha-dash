@@ -87,23 +87,20 @@ describe("installEtagHook", () => {
     };
 
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo",
-        ({ request }) => {
-          serverCalls++;
-          const ifNoneMatch = request.headers.get("if-none-match");
-          seenIfNoneMatch.push(ifNoneMatch);
-          if (ifNoneMatch === '"abc123"') {
-            return new HttpResponse(null, {
-              status: 304,
-              headers: { etag: '"abc123"' },
-            });
-          }
-          return HttpResponse.json(realData, {
+      http.get("https://api.github.com/repos/owner/repo", ({ request }) => {
+        serverCalls++;
+        const ifNoneMatch = request.headers.get("if-none-match");
+        seenIfNoneMatch.push(ifNoneMatch);
+        if (ifNoneMatch === '"abc123"') {
+          return new HttpResponse(null, {
+            status: 304,
             headers: { etag: '"abc123"' },
           });
-        },
-      ),
+        }
+        return HttpResponse.json(realData, {
+          headers: { etag: '"abc123"' },
+        });
+      }),
     );
 
     const cache = new EtagCache();
@@ -155,26 +152,35 @@ describe("installEtagHook", () => {
   it("re-fetches when server returns 200 with a new etag (data changed)", async () => {
     let phase = 1;
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo",
-        ({ request }) => {
-          const ifNoneMatch = request.headers.get("if-none-match");
-          if (phase === 1) {
-            return HttpResponse.json(
-              { default_branch: "main", id: 1, name: "repo", full_name: "owner/repo", owner: { login: "owner" } },
-              { headers: { etag: '"v1"' } },
-            );
-          }
-          // phase 2: data changed — return 200 with new etag, ignoring old If-None-Match
-          if (ifNoneMatch === '"v1"') {
-            return HttpResponse.json(
-              { default_branch: "develop", id: 1, name: "repo", full_name: "owner/repo", owner: { login: "owner" } },
-              { headers: { etag: '"v2"' } },
-            );
-          }
-          return new HttpResponse(null, { status: 500 });
-        },
-      ),
+      http.get("https://api.github.com/repos/owner/repo", ({ request }) => {
+        const ifNoneMatch = request.headers.get("if-none-match");
+        if (phase === 1) {
+          return HttpResponse.json(
+            {
+              default_branch: "main",
+              id: 1,
+              name: "repo",
+              full_name: "owner/repo",
+              owner: { login: "owner" },
+            },
+            { headers: { etag: '"v1"' } },
+          );
+        }
+        // phase 2: data changed — return 200 with new etag, ignoring old If-None-Match
+        if (ifNoneMatch === '"v1"') {
+          return HttpResponse.json(
+            {
+              default_branch: "develop",
+              id: 1,
+              name: "repo",
+              full_name: "owner/repo",
+              owner: { login: "owner" },
+            },
+            { headers: { etag: '"v2"' } },
+          );
+        }
+        return new HttpResponse(null, { status: 500 });
+      }),
     );
 
     const cache = new EtagCache();
@@ -191,12 +197,14 @@ describe("installEtagHook", () => {
     expect(cache.hits()).toBe(0);
 
     // Cache should now hold v2
-    const entry = cache.get(EtagCache.keyFor({
-      method: "GET",
-      url: "/repos/{owner}/{repo}",
-      owner: "owner",
-      repo: "repo",
-    }));
+    const entry = cache.get(
+      EtagCache.keyFor({
+        method: "GET",
+        url: "/repos/{owner}/{repo}",
+        owner: "owner",
+        repo: "repo",
+      }),
+    );
     expect(entry?.etag).toBe('"v2"');
   });
 
@@ -327,7 +335,7 @@ describe("installEtagHook", () => {
     expect(cache.noEtagResponses()).toBe(2);
   });
 
-  it("skips ETag caching entirely when SKIP_ETAG_CACHE_HEADER is set", async () => {
+  it("strips SKIP_ETAG_CACHE_HEADER and bypasses If-None-Match but still caches the fresh response", async () => {
     const seenIfNoneMatch: (string | null)[] = [];
     const seenSkipHeader: (string | null)[] = [];
     server.use(
@@ -350,7 +358,7 @@ describe("installEtagHook", () => {
     const octokit = makeOctokit();
     installEtagHook(octokit, cache);
 
-    // First call with skip header set
+    // First call with skip header — bypasses If-None-Match but caches result.
     await octokit.pulls.list({
       owner: "owner",
       repo: "repo",
@@ -358,7 +366,8 @@ describe("installEtagHook", () => {
       per_page: 1,
       headers: { [SKIP_ETAG_CACHE_HEADER]: "1" },
     });
-    // Second call same way
+    // Second call also with skip header — still bypasses If-None-Match even
+    // though cache now has an entry; re-caches the fresh response.
     await octokit.pulls.list({
       owner: "owner",
       repo: "repo",
@@ -367,14 +376,75 @@ describe("installEtagHook", () => {
       headers: { [SKIP_ETAG_CACHE_HEADER]: "1" },
     });
 
-    // Cache was never populated
-    expect(cache.size()).toBe(0);
+    // Cache was populated with the fresh ETag so non-skip callers benefit.
+    expect(cache.size()).toBe(1);
     expect(cache.hits()).toBe(0);
-    expect(cache.misses()).toBe(0);
+    expect(cache.misses()).toBe(2);
 
     // Skip header was stripped before reaching the server, and no
-    // if-none-match was sent (no cached entry)
+    // If-None-Match was sent on either request.
     expect(seenIfNoneMatch).toEqual([null, null]);
     expect(seenSkipHeader).toEqual([null, null]);
+  });
+
+  it("a skip-header call after a cached entry still refreshes the cache with fresh data", async () => {
+    let phase = 1;
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/pulls",
+        ({ request }) => {
+          const ifNoneMatch = request.headers.get("if-none-match");
+          if (phase === 1) {
+            return HttpResponse.json([{ id: 1, number: 1, state: "open" }], {
+              headers: { etag: '"v1"' },
+            });
+          }
+          // Phase 2: data genuinely changed. A normal conditional request
+          // would 304 (simulating GitHub's lagging ETag) — the skip-header
+          // path must avoid sending If-None-Match and accept fresh data.
+          if (ifNoneMatch === '"v1"') {
+            return new HttpResponse(null, {
+              status: 304,
+              headers: { etag: '"v1"' },
+            });
+          }
+          return HttpResponse.json(
+            [
+              { id: 1, number: 1, state: "open" },
+              { id: 2, number: 2, state: "open" },
+            ],
+            { headers: { etag: '"v2"' } },
+          );
+        },
+      ),
+    );
+
+    const cache = new EtagCache();
+    const octokit = makeOctokit();
+    installEtagHook(octokit, cache);
+
+    // Phase 1: normal request populates cache with v1.
+    const r1 = await octokit.pulls.list({ owner: "owner", repo: "repo" });
+    expect(r1.data.length).toBe(1);
+
+    // Phase 2: skip-header call must ignore the cached v1 ETag, receive
+    // fresh data, and update the cache to v2.
+    phase = 2;
+    const r2 = await octokit.pulls.list({
+      owner: "owner",
+      repo: "repo",
+      headers: { [SKIP_ETAG_CACHE_HEADER]: "1" },
+    });
+    expect(r2.data.length).toBe(2);
+
+    const entry = cache.get(
+      EtagCache.keyFor({
+        method: "GET",
+        url: "/repos/{owner}/{repo}/pulls",
+        owner: "owner",
+        repo: "repo",
+      }),
+    );
+    expect(entry?.etag).toBe('"v2"');
   });
 });

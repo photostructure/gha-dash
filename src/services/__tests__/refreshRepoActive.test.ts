@@ -1,9 +1,9 @@
 import { Octokit } from "@octokit/rest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 import {
   afterAll,
   afterEach,
@@ -21,7 +21,7 @@ import {
 } from "../../state.js";
 import { defaultConfig, type WorkflowRun } from "../../types.js";
 import { Cache } from "../cache.js";
-import { EtagCache } from "../etagCache.js";
+import { EtagCache, installEtagHook } from "../etagCache.js";
 
 const server = setupServer();
 
@@ -43,13 +43,16 @@ afterEach(async () => {
 });
 
 function makeState(): AppState {
+  const octokit = new Octokit({
+    auth: "test-token",
+    baseUrl: "https://api.github.com",
+  });
+  const etagCache = new EtagCache();
+  installEtagHook(octokit, etagCache);
   return {
     config: { ...defaultConfig },
-    octokit: new Octokit({
-      auth: "test-token",
-      baseUrl: "https://api.github.com",
-    }),
-    etagCache: new EtagCache(),
+    octokit,
+    etagCache,
     username: "test-user",
     cache: new Cache<WorkflowRun[]>(300),
     repoStats: new Map(),
@@ -92,13 +95,11 @@ describe("refreshRepoActive", () => {
     // Only register the runs endpoint. msw is configured with
     // onUnhandledRequest: "error", so any other endpoint hit fails the test.
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () =>
-          HttpResponse.json({
-            total_count: 1,
-            workflow_runs: [makeApiRun(1, 100)],
-          }),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () =>
+        HttpResponse.json({
+          total_count: 1,
+          workflow_runs: [makeApiRun(1, 100)],
+        }),
       ),
     );
 
@@ -117,13 +118,11 @@ describe("refreshRepoActive", () => {
     __setStateForTests(state);
 
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () =>
-          HttpResponse.json({
-            total_count: 2,
-            workflow_runs: [makeApiRun(1, 100), makeApiRun(2, 999)],
-          }),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () =>
+        HttpResponse.json({
+          total_count: 2,
+          workflow_runs: [makeApiRun(1, 100), makeApiRun(2, 999)],
+        }),
       ),
     );
 
@@ -140,13 +139,11 @@ describe("refreshRepoActive", () => {
     __setStateForTests(state);
 
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () =>
-          HttpResponse.json({
-            total_count: 2,
-            workflow_runs: [makeApiRun(1, 100), makeApiRun(2, 200)],
-          }),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () =>
+        HttpResponse.json({
+          total_count: 2,
+          workflow_runs: [makeApiRun(1, 100), makeApiRun(2, 200)],
+        }),
       ),
     );
 
@@ -181,13 +178,11 @@ describe("refreshRepoActive", () => {
     __setStateForTests(state);
 
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () =>
-          HttpResponse.json({
-            total_count: 0,
-            workflow_runs: [],
-          }),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () =>
+        HttpResponse.json({
+          total_count: 0,
+          workflow_runs: [],
+        }),
       ),
     );
 
@@ -221,13 +216,11 @@ describe("refreshRepoActive", () => {
     __setStateForTests(state);
 
     server.use(
-      http.get(
-        "https://api.github.com/repos/owner/repo/actions/runs",
-        () =>
-          HttpResponse.json(
-            { message: "API rate limit exceeded" },
-            { status: 403 },
-          ),
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () =>
+        HttpResponse.json(
+          { message: "API rate limit exceeded" },
+          { status: 403 },
+        ),
       ),
     );
 
@@ -236,6 +229,61 @@ describe("refreshRepoActive", () => {
     const entry = state.cache.get("owner/repo");
     expect(entry?.data).toEqual(existing); // stale data preserved
     expect(entry?.error).toContain("rate limit"); // error noted
+  });
+
+  it("bypasses If-None-Match even when an ETag is cached for the runs endpoint", async () => {
+    // Regression: conditional requests against the runs endpoint have been
+    // observed returning 304 while a run's status actually changed on the
+    // server, leaving the dashboard stuck on "queued" for the run's lifetime.
+    // Active-refresh must send a plain request and accept fresh data.
+    const state = makeState();
+    state.workflowIds.set("owner/repo", new Set([100]));
+    __setStateForTests(state);
+
+    const seenIfNoneMatch: (string | null)[] = [];
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/runs",
+        ({ request }) => {
+          seenIfNoneMatch.push(request.headers.get("if-none-match"));
+          return HttpResponse.json(
+            {
+              total_count: 1,
+              workflow_runs: [
+                makeApiRun(1, 100, {
+                  status: "in_progress",
+                  conclusion: null,
+                }),
+              ],
+            },
+            { headers: { etag: '"runs-v2"' } },
+          );
+        },
+      ),
+    );
+
+    // Prime the ETag cache with a stale entry for this URL — a conditional
+    // request would 304 here and return stale data.
+    const key = EtagCache.keyFor({
+      method: "GET",
+      url: "/repos/{owner}/{repo}/actions/runs",
+      owner: "owner",
+      repo: "repo",
+      per_page: 100,
+    });
+    state.etagCache.set(key, {
+      etag: '"runs-v1"',
+      data: { total_count: 1, workflow_runs: [] },
+    });
+
+    await refreshRepoActive("owner/repo");
+
+    // The request must go out WITHOUT If-None-Match, and fresh data wins.
+    expect(seenIfNoneMatch).toEqual([null]);
+    const entry = state.cache.get("owner/repo");
+    expect(entry?.data[0].status).toBe("in_progress");
+    // Cache should also have been refreshed with the new ETag.
+    expect(state.etagCache.get(key)?.etag).toBe('"runs-v2"');
   });
 
   it("is a no-op when state is null", async () => {

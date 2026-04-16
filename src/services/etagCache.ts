@@ -120,8 +120,13 @@ export function installEtagHook(octokit: Octokit, cache: EtagCache): void {
       return request(options);
     }
 
-    // Per-request opt-out: caller passes the skip header to bypass caching.
-    // Strip the marker before it goes out so it doesn't reach GitHub.
+    // Per-request opt-out: caller passes the skip header to bypass the
+    // conditional If-None-Match (because they must see ground truth — e.g.
+    // actions runs list, whose ETag lags status transitions). Strip the
+    // marker before it goes out so it doesn't reach GitHub. We still cache
+    // the fresh 200 response below, so later refreshes benefit from the
+    // updated ETag.
+    let skipCache = false;
     if (
       options.headers &&
       SKIP_ETAG_CACHE_HEADER in (options.headers as Record<string, unknown>)
@@ -129,11 +134,11 @@ export function installEtagHook(octokit: Octokit, cache: EtagCache): void {
       const stripped = { ...options.headers } as Record<string, unknown>;
       delete stripped[SKIP_ETAG_CACHE_HEADER];
       options.headers = stripped as typeof options.headers;
-      return request(options);
+      skipCache = true;
     }
 
     const key = EtagCache.keyFor(options as Record<string, unknown>);
-    const cached = cache.get(key);
+    const cached = skipCache ? undefined : cache.get(key);
 
     // Mutate options.headers IN PLACE. The before-after-hook wrap chain
     // binds `options` as a fixed argument when the chain is built, so any
