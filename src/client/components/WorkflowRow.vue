@@ -1,13 +1,22 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { WorkflowRun } from "../../types.js";
 import { formatDuration, relativeTime } from "../../types.js";
+import { useNow } from "../composables/useNow.js";
 import DispatchForm from "./DispatchForm.vue";
 import StatusBadge from "./StatusBadge.vue";
 
-defineProps<{ run: WorkflowRun; canPush: boolean }>();
+const props = defineProps<{ run: WorkflowRun; canPush: boolean }>();
 
 const showDispatch = ref(false);
+
+// Live-tick elapsed time for in-flight runs. Completed runs use the
+// server-computed duration (stable; avoids drift if polls lag).
+const now = useNow();
+const displayDuration = computed(() => {
+  if (props.run.status === "completed") return props.run.duration;
+  return now.value - new Date(props.run.startedAt).getTime();
+});
 
 function workflowUrl(run: WorkflowRun): string {
   const file = run.workflowPath.split("/").pop();
@@ -37,7 +46,7 @@ function workflowUrl(run: WorkflowRun): string {
     <td :title="new Date(run.createdAt).toLocaleString()">
       {{ relativeTime(run.createdAt) }}
     </td>
-    <td>{{ formatDuration(run.duration) }}</td>
+    <td>{{ formatDuration(displayDuration) }}</td>
     <td class="actions-col">
       <button
         type="button"
