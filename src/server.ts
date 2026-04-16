@@ -29,7 +29,21 @@ export function createApp() {
     app.use(express.static(clientDir));
     app.get("/{*path}", (req, res, next) => {
       if (req.path.startsWith("/api/")) return next();
-      res.sendFile(join(clientDir, "index.html"));
+      res.sendFile(join(clientDir, "index.html"), (err) => {
+        if (!err) return;
+        const code = (err as NodeJS.ErrnoException).code;
+        const status = (err as { status?: number }).status;
+        if (code === "ENOENT" || status === 404) {
+          if (!res.headersSent) {
+            res
+              .status(503)
+              .type("text")
+              .send("gha-dash is starting — retry in a moment.");
+          }
+          return;
+        }
+        next(err);
+      });
     });
   } else {
     // Dev mode: no built SPA
