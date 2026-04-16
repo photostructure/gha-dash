@@ -303,11 +303,24 @@ th.sort-desc::after {
 .dot-failure {
   background: var(--failure);
 }
-.dot-in_progress,
 .dot-queued,
 .dot-waiting,
 .dot-pending {
   background: var(--pending);
+}
+.dot-in_progress {
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(
+    circle,
+    var(--pending) 0 1.5px,
+    transparent 1.5px
+  );
+  border: 1.5px solid var(--pending);
+  border-right-color: transparent;
+  border-radius: 50%;
+  box-sizing: border-box;
+  animation: spin 1s linear infinite;
 }
 .dot-cancelled,
 .dot-skipped,
@@ -377,6 +390,23 @@ th.sort-desc::after {
 .status-pending {
   background: var(--pending-bg);
   color: var(--pending);
+}
+.status-in_progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.status-in_progress::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  background: radial-gradient(circle, currentColor 0 1.5px, transparent 1.5px);
+  box-sizing: border-box;
+  animation: spin 1s linear infinite;
 }
 .status-cancelled,
 .status-skipped,
