@@ -86,7 +86,7 @@ lore). Key points:
   repos, cached branch names, and rate limit settings.
 - **Disk cache**: `~/.config/gha-dash/cache.json` — restarts don't refetch.
 - **Security**: localhost-only, token never exposed to browser, security headers.
-- **Dev**: `npm run dev:all` runs Express (tsx watch) + Vite dev server concurrently.
+- **Dev**: `npm run dev` runs Express (tsx watch) + Vite dev server concurrently.
   Open `http://localhost:5173` for Vue (proxies API to :3131).
 
 ## Rate Limiting
