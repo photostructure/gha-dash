@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1 (2026-04-27)
+
+### Fixes
+
+- **Refresh reliability** — Workflow run refreshes now avoid stale GitHub Actions ETags, while rate-limit budgeting accounts for the extra uncached API work.
+- **Quieter polling** — Removed temporary Octokit request logging so normal dashboard refreshes no longer print every GitHub API call.
+
 ## 0.8.0 (2026-04-15)
 
 ### Features
