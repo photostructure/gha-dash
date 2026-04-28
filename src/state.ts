@@ -16,7 +16,6 @@ import {
   fetchWorkflowRuns,
 } from "./services/github.js";
 import {
-  ACTIVE_STATUSES,
   computeNextRefresh,
   updateDurationHistory,
 } from "./services/scheduler.js";
@@ -46,6 +45,7 @@ export const stateEvents = new EventEmitter();
 let refreshPromise: Promise<void> | null = null;
 let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
 let fullRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+const FULL_REFRESH_COUNTED_CALLS_PER_REPO = 2;
 
 export function getAppState(): AppState {
   if (!state)
@@ -153,25 +153,8 @@ async function doRefresh(): Promise<void> {
     // Calculate how many repos we can afford to refresh this cycle
     const maxRepos = computeBudget(state, repos.length);
 
-    // Repos whose cached state currently shows an active run. For these, the
-    // full refresh must bypass the ETag cache on the runs endpoint — GitHub
-    // can return 304 even while status transitioned, and a 304-sourced cache
-    // body would clobber fresher data written by refreshRepoActive.
-    const activeRepos = new Set<string>();
-    for (const [repo, entry] of state.cache.entries()) {
-      if (entry.data.some((r) => ACTIVE_STATUSES.has(r.status))) {
-        activeRepos.add(repo);
-      }
-    }
-
     const { runs, stats, errors, discoveredBranches, workflowIds } =
-      await fetchAllRuns(
-        state.octokit,
-        repos,
-        state.config.branches,
-        maxRepos,
-        activeRepos,
-      );
+      await fetchAllRuns(state.octokit, repos, state.config.branches, maxRepos);
 
     for (const [repo, repoRuns] of runs) {
       if (repoRuns.length > 0) {
@@ -267,10 +250,11 @@ async function doRefresh(): Promise<void> {
 
 /**
  * Compute how many repos we can refresh this cycle based on rate limit budget.
- * Each repo costs 1 API call (runs) + possibly 1 (branch, if not cached).
+ * Full refresh always spends two counted calls per repo: PR stats and runs.
+ * Other repo/workflow requests are conditional and only count on ETag misses.
  * Returns undefined if no budget constraint applies (fetch all).
  */
-function computeBudget(
+export function computeBudget(
   state: AppState,
   totalRepos: number,
 ): number | undefined {
@@ -284,10 +268,14 @@ function computeBudget(
   const budgetFromPct = Math.floor(limit * pct);
   const available = Math.min(remaining - floor, budgetFromPct);
 
-  if (available >= totalRepos) return undefined; // Can afford all repos
+  const affordableRepos = Math.floor(
+    available / FULL_REFRESH_COUNTED_CALLS_PER_REPO,
+  );
+
+  if (affordableRepos >= totalRepos) return undefined; // Can afford all repos
   if (available <= 0) return 0;
 
-  return available;
+  return affordableRepos;
 }
 
 export function startBackgroundRefresh(): void {
@@ -401,15 +389,7 @@ export async function refreshRepo(fullName: string): Promise<void> {
     state.repoStats.set(fullName, repoStats);
     state.workflowIds.set(fullName, activeIds);
 
-    const runs = await fetchWorkflowRuns(
-      state.octokit,
-      owner,
-      repo,
-      activeIds,
-      {
-        skipEtagCache: true,
-      },
-    );
+    const runs = await fetchWorkflowRuns(state.octokit, owner, repo, activeIds);
 
     if (runs.length > 0) {
       state.cache.set(fullName, runs);
@@ -452,13 +432,7 @@ export async function refreshRepoActive(fullName: string): Promise<void> {
   const cachedIds = state.workflowIds.get(fullName);
 
   try {
-    const runs = await fetchWorkflowRuns(
-      state.octokit,
-      owner,
-      repo,
-      cachedIds,
-      { skipEtagCache: true },
-    );
+    const runs = await fetchWorkflowRuns(state.octokit, owner, repo, cachedIds);
 
     if (runs.length > 0) {
       state.cache.set(fullName, runs);

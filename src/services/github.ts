@@ -3,6 +3,7 @@ import { execSync } from "node:child_process";
 import pLimit from "p-limit";
 import type { WorkflowRun } from "../types.js";
 import { SKIP_ETAG_CACHE_HEADER } from "./etagCache.js";
+import { ACTIVE_STATUSES } from "./scheduler.js";
 
 const API_CONCURRENCY = 10;
 
@@ -156,32 +157,24 @@ export async function fetchWorkflowRuns(
   owner: string,
   repo: string,
   activeWorkflowIds?: Set<number>,
-  opts?: { skipEtagCache?: boolean },
 ): Promise<WorkflowRun[]> {
   // Observed in production: conditional requests against this endpoint can
   // return 304 while an individual run's status has actually changed on
-  // GitHub (e.g. queued → in_progress), so the dashboard stays stale for the
-  // lifetime of the run. Root cause unclear — could be coarse ETag generation
-  // upstream, a CDN edge serving a stale ETag, or something else. Either way,
-  // callers that must see ground truth (active-run polling, manual refresh)
-  // opt out via SKIP_ETAG_CACHE_HEADER so no If-None-Match is sent.
+  // GitHub (e.g. queued → in_progress, or a brand-new run that just started),
+  // so the dashboard stays stale for the lifetime of the run. Root cause
+  // unclear — could be coarse ETag generation upstream, a CDN edge serving a
+  // stale ETag, or something else. Either way, the endpoint can't be trusted
+  // with If-None-Match, so we always bypass the ETag cache here. We still
+  // record the response's fresh ETag for any future caller that does opt in.
   const { data } = await octokit.actions.listWorkflowRunsForRepo({
     owner,
     repo,
     per_page: 100,
-    ...(opts?.skipEtagCache
-      ? { headers: { [SKIP_ETAG_CACHE_HEADER]: "1" } }
-      : {}),
+    headers: { [SKIP_ETAG_CACHE_HEADER]: "1" },
   });
 
   // Keep all active runs + latest completed run per workflow.
   // Runs are sorted newest-first by the API.
-  const ACTIVE_STATUSES = new Set([
-    "queued",
-    "in_progress",
-    "waiting",
-    "pending",
-  ]);
   const results: WorkflowRun[] = [];
   const seenCompleted = new Set<number>();
 
@@ -249,8 +242,10 @@ export interface FetchResult {
 
 /**
  * Fetch runs for repos in parallel, capped at API_CONCURRENCY.
- * Each repo costs 2 API calls: one for active workflows, one for runs.
- * Default branch is also fetched if not cached (for dispatch).
+ * In steady state, each repo costs 2 counted API calls: one uncached
+ * pulls.list request for PR counts, and one uncached actions/runs request.
+ * Repo metadata and active workflows use conditional requests, so they only
+ * count against quota on ETag misses.
  * If maxRepos is set, only fetches that many repos (for budget throttling).
  */
 export async function fetchAllRuns(
@@ -258,13 +253,6 @@ export async function fetchAllRuns(
   repos: string[],
   cachedBranches: Record<string, string>,
   maxRepos?: number,
-  /**
-   * Repos currently believed to have active (queued/in_progress/…) runs.
-   * For these, the runs fetch bypasses the ETag cache so we always see ground
-   * truth instead of a 304 that would overwrite fresher active-refresh data
-   * with stale cache body.
-   */
-  activeRepos?: Set<string>,
 ): Promise<FetchResult> {
   const limit = pLimit(API_CONCURRENCY);
   const runs = new Map<string, WorkflowRun[]>();
@@ -310,7 +298,6 @@ export async function fetchAllRuns(
             owner,
             repo,
             activeIds,
-            { skipEtagCache: activeRepos?.has(fullName) ?? false },
           );
           runs.set(fullName, result);
           stats.set(fullName, repoStats);
