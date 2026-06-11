@@ -159,7 +159,7 @@ export function apiRoutes(): Router {
   });
 
   // POST /api/dispatch/:owner/:repo/:id — trigger dispatch
-  router.post("/dispatch/:owner/:repo/:id", async (req, res, _next) => {
+  router.post("/dispatch/:owner/:repo/:id", async (req, res) => {
     try {
       const { owner, repo, id } = req.params;
       const workflowId = parseInt(id, 10);
