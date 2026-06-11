@@ -17,7 +17,12 @@
     "test:watch": "vitest",
     "fmt": "prettier --write .",
     "fmt:check": "prettier --check .",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "update": "run-p update:*",
+    "update:ncu": "npm-check-updates --upgrade --install always",
+    "install:pinact": "go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@latest",
+    "update:pinact": "pinact run -u",
+    "all": "run-s update fmt lint build test"
   },
   "keywords": [
     "github",
@@ -42,28 +47,30 @@
     "@octokit/rest": "^22.0.1",
     "express": "^5.2.1",
     "p-limit": "^7.3.0",
-    "vue": "^3.5.31",
-    "vue-router": "^5.0.4",
-    "yaml": "^2.8.3"
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.5.0",
+    "@types/node": "25.9.1",
     "@types/supertest": "^7.2.0",
-    "@vitejs/plugin-vue": "^6.0.5",
+    "@vitejs/plugin-vue": "6.0.7",
     "concurrently": "^9.2.1",
     "eslint-config-prettier": "^10.1.8",
-    "msw": "^2.12.14",
-    "prettier": "^3.8.1",
+    "msw": "2.14.6",
+    "npm-check-updates": "^22.2.3",
+    "npm-run-all2": "^9.0.1",
+    "prettier": "3.8.3",
     "prettier-plugin-organize-imports": "^4.3.0",
     "supertest": "^7.2.2",
     "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.0",
-    "vite": "^8.0.3",
-    "vitest": "^4.1.2",
-    "vue-tsc": "^3.2.6"
+    "tsx": "4.22.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.60.0",
+    "vite": "8.0.14",
+    "vitest": "4.1.7",
+    "vue": "3.5.35",
+    "vue-router": "5.0.7",
+    "vue-tsc": "3.3.2"
   }
 }
