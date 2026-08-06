@@ -15,6 +15,7 @@ npm install
 npm run dev       # Express (tsx watch) + Vite dev server
 npm test          # vitest (56 tests)
 npm run build     # tsup (server) + vite (client) → dist/
+make preflight    # fmt + lint + build + test: run before a release
 ```
 
 Dev: open `http://localhost:5173` (Vite proxies API to Express on :3131).
