@@ -1,5 +1,9 @@
 # gha-dash
 
+[![npm version](https://img.shields.io/npm/v/gha-dash.svg)](https://www.npmjs.com/package/gha-dash)
+[![Build & Release](https://github.com/photostructure/gha-dash/actions/workflows/build.yml/badge.svg)](https://github.com/photostructure/gha-dash/actions/workflows/build.yml)
+[![License: Apache-2.0](https://img.shields.io/npm/l/gha-dash.svg)](https://github.com/photostructure/gha-dash/blob/main/LICENSE)
+
 Local web dashboard for GitHub Actions. See workflow status across all your repos at a glance.
 
 **Only prerequisite:** an authenticated [`gh` CLI](https://cli.github.com/).
