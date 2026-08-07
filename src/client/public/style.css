@@ -77,6 +77,15 @@ header h1 {
 header h1 a {
   color: var(--text);
 }
+.product-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.product-title img {
+  width: 1.25em;
+  height: 1.25em;
+}
 header nav {
   display: flex;
   align-items: center;

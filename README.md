@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="src/client/public/logo.svg" alt="gha-dash" width="256">
+</p>
+
 # gha-dash
 
 [![npm version](https://img.shields.io/npm/v/gha-dash.svg)](https://www.npmjs.com/package/gha-dash)

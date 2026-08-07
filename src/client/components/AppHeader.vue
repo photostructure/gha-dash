@@ -15,7 +15,12 @@ const route = useRoute();
 
 <template>
   <header>
-    <h1><router-link to="/">gha-dash</router-link></h1>
+    <h1>
+      <router-link class="product-title" to="/">
+        <img src="/logo.svg" alt="" aria-hidden="true" />
+        gha-dash
+      </router-link>
+    </h1>
     <nav>
       <template v-if="route.path === '/settings'">
         <router-link to="/">&larr; Dashboard</router-link>
