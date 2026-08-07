@@ -50,55 +50,22 @@ Shared context for all gha-dash TPPs. This is a reference doc, not a TPP.
 
 ## Core Types
 
-```typescript
-// src/types.ts
-
-export interface AppConfig {
-  repos: string[]; // "owner/repo" format; empty = show all
-  availableRepos: string[];
-  branches: Record<string, string>;
-  hiddenWorkflows: string[];
-  refreshInterval: number; // seconds, default 3600
-  rateLimitFloor: number;
-  rateBudgetPct: number;
-  port: number; // default 3131
-}
-
-export interface WorkflowRun {
-  workflowId: number;
-  workflowName: string;
-  repo: string; // "owner/repo"
-  status: RunStatus;
-  conclusion: RunConclusion | null;
-  branch: string;
-  commitSha: string;
-  commitMessage: string;
-  duration: number; // milliseconds
-  createdAt: string; // ISO 8601
-  htmlUrl: string;
-  workflowPath: string;
-}
-
-export type RunStatus = "completed" | "in_progress" | "queued" | "waiting";
-export type RunConclusion =
-  | "success"
-  | "failure"
-  | "cancelled"
-  | "skipped"
-  | "timed_out";
-```
+[`src/types.ts`](../src/types.ts) is the canonical source for shared server and
+client types, including `AppConfig`, `WorkflowRun`, `RunStatus`, and
+`RunConclusion`.
 
 ## API Routes
 
-| Route                            | Method | Purpose                                         |
-| -------------------------------- | ------ | ----------------------------------------------- |
-| `/api/workflows`                 | GET    | Grouped workflow runs + errors + rate limit     |
-| `/api/config`                    | GET    | Current configuration                           |
-| `/api/config`                    | PUT    | Update configuration, triggers refresh          |
-| `/api/refresh`                   | POST   | Refresh all repos, returns updated data         |
-| `/api/refresh/:owner/:repo`      | POST   | Refresh single repo, returns updated data       |
-| `/api/dispatch/:owner/:repo/:id` | GET    | Dispatch form metadata (inputs, default branch) |
-| `/api/dispatch/:owner/:repo/:id` | POST   | Trigger workflow dispatch                       |
+| Route                            | Method | Purpose                                             |
+| -------------------------------- | ------ | --------------------------------------------------- |
+| `/api/workflows`                 | GET    | Grouped workflow runs + errors + rate limit         |
+| `/api/config`                    | GET    | Current configuration                               |
+| `/api/config/repos/refresh`      | POST   | Re-discover repositories without changing selection |
+| `/api/config`                    | PUT    | Update configuration, triggers refresh              |
+| `/api/refresh`                   | POST   | Refresh all repos, returns updated data             |
+| `/api/refresh/:owner/:repo`      | POST   | Refresh single repo, returns updated data           |
+| `/api/dispatch/:owner/:repo/:id` | GET    | Dispatch form metadata (inputs, default branch)     |
+| `/api/dispatch/:owner/:repo/:id` | POST   | Trigger workflow dispatch                           |
 
 ## Frontend Architecture
 
