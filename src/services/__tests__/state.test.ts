@@ -51,23 +51,19 @@ describe("cache pruning on repo change", () => {
   });
 });
 
-describe("refreshRepo preserves cache on empty result", () => {
-  it("keeps existing data when fresh fetch returns empty", () => {
+describe("refresh cache reconciliation", () => {
+  it("replaces existing data when a successful fetch returns empty", () => {
     const cache = new Cache<WorkflowRun[]>(300);
     const existing = [mockRun("owner/repo", "ci")];
     cache.set("owner/repo", existing);
 
-    // Simulate: fetchWorkflowRuns returned empty (lookback filtered everything)
+    // A successful response is authoritative, including an empty run list.
     const freshRuns: WorkflowRun[] = [];
 
-    // This is the logic from refreshRepo: only update if runs.length > 0
-    if (freshRuns.length > 0) {
-      cache.set("owner/repo", freshRuns);
-    }
+    cache.set("owner/repo", freshRuns);
 
-    // Existing data should be preserved
     const entry = cache.get("owner/repo");
-    expect(entry?.data).toEqual(existing);
+    expect(entry?.data).toEqual([]);
   });
 
   it("records error but keeps stale data on fetch failure", () => {

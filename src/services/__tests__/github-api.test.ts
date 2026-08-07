@@ -4,6 +4,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { EtagCache, installEtagHook } from "../etagCache.js";
 import {
+  createRunsOctokit,
   fetchActiveWorkflowIds,
   fetchRepoMeta,
   fetchWorkflowRuns,
@@ -21,6 +22,46 @@ function makeOctokit(): Octokit {
     baseUrl: "https://api.github.com",
   });
 }
+
+describe("createRunsOctokit", () => {
+  it("strips caller-supplied conditional validators", async () => {
+    const seenHeaders: Array<{
+      ifNoneMatch: string | null;
+      ifModifiedSince: string | null;
+      cacheControl: string | null;
+    }> = [];
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/runs",
+        ({ request }) => {
+          seenHeaders.push({
+            ifNoneMatch: request.headers.get("if-none-match"),
+            ifModifiedSince: request.headers.get("if-modified-since"),
+            cacheControl: request.headers.get("cache-control"),
+          });
+          return HttpResponse.json({ total_count: 0, workflow_runs: [] });
+        },
+      ),
+    );
+
+    await createRunsOctokit("test-token").actions.listWorkflowRunsForRepo({
+      owner: "owner",
+      repo: "repo",
+      headers: {
+        "if-none-match": '"stale-runs"',
+        "if-modified-since": "Wed, 21 Oct 2015 07:28:00 GMT",
+      },
+    });
+
+    expect(seenHeaders).toEqual([
+      {
+        ifNoneMatch: null,
+        ifModifiedSince: null,
+        cacheControl: "no-cache",
+      },
+    ]);
+  });
+});
 
 describe("fetchRepoMeta", () => {
   it("returns default branch and open issues count", async () => {
@@ -196,6 +237,105 @@ describe("fetchWorkflowRuns", () => {
     expect(runs[1].status).toBe("completed");
   });
 
+  it("keeps requested runs active alongside the latest completed run", async () => {
+    server.use(
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
+        return HttpResponse.json({
+          total_count: 2,
+          workflow_runs: [
+            makeRun(2, 100, "main", now, {
+              status: "requested",
+              conclusion: null,
+            }),
+            makeRun(1, 100, "main", oneHourAgo),
+          ],
+        });
+      }),
+    );
+
+    const runs = await fetchWorkflowRuns(makeOctokit(), "owner", "repo");
+
+    expect(runs).toHaveLength(2);
+    expect(runs[0].status).toBe("requested");
+    expect(runs[1].status).toBe("completed");
+  });
+
+  it("uses check-suite state when the workflow run is still queued", async () => {
+    const seenCacheControl: (string | null)[] = [];
+    server.use(
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () =>
+        HttpResponse.json({
+          total_count: 1,
+          workflow_runs: [
+            makeRun(2, 100, "main", now, {
+              status: "queued",
+              conclusion: null,
+              check_suite_id: 42,
+            }),
+          ],
+        }),
+      ),
+      http.get(
+        "https://api.github.com/repos/owner/repo/check-suites/42",
+        ({ request }) => {
+          seenCacheControl.push(request.headers.get("cache-control"));
+          return HttpResponse.json({
+            id: 42,
+            status: "in_progress",
+            conclusion: null,
+            updated_at: now.toISOString(),
+          });
+        },
+      ),
+    );
+
+    const runs = await fetchWorkflowRuns(
+      createRunsOctokit("test-token"),
+      "owner",
+      "repo",
+    );
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe("in_progress");
+    expect(seenCacheControl).toEqual(["no-cache"]);
+  });
+
+  it("uses a completed check suite before deduplicating workflow runs", async () => {
+    server.use(
+      http.get("https://api.github.com/repos/owner/repo/actions/runs", () =>
+        HttpResponse.json({
+          total_count: 2,
+          workflow_runs: [
+            makeRun(2, 100, "main", now, {
+              status: "in_progress",
+              conclusion: null,
+              check_suite_id: 43,
+            }),
+            makeRun(1, 100, "main", oneHourAgo),
+          ],
+        }),
+      ),
+      http.get("https://api.github.com/repos/owner/repo/check-suites/43", () =>
+        HttpResponse.json({
+          id: 43,
+          status: "completed",
+          conclusion: "failure",
+          updated_at: new Date(now.getTime() + 60_000).toISOString(),
+        }),
+      ),
+    );
+
+    const runs = await fetchWorkflowRuns(
+      createRunsOctokit("test-token"),
+      "owner",
+      "repo",
+    );
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe("completed");
+    expect(runs[0].conclusion).toBe("failure");
+  });
+
   it("keeps all active runs across multiple workflows plus latest completed", async () => {
     server.use(
       http.get("https://api.github.com/repos/owner/repo/actions/runs", () => {
@@ -223,19 +363,17 @@ describe("fetchWorkflowRuns", () => {
     expect(runs).toHaveLength(4);
   });
 
-  it("never sends If-None-Match on the runs endpoint, even with a cached ETag", async () => {
-    // GitHub's actions/runs ETag has been observed returning 304 while a
-    // run's status actually changed (queued → in_progress, or a new run
-    // arrived). The dashboard then sticks on stale data, which is why the
-    // refresh button "doesn't refresh" and auto-refresh "sometimes works."
-    // fetchWorkflowRuns must always bypass the ETag cache regardless of
-    // whether a cached entry exists.
+  it("does not send conditional headers from the uncached runs client", async () => {
     const seenIfNoneMatch: (string | null)[] = [];
+    const seenIfModifiedSince: (string | null)[] = [];
+    const seenCacheControl: (string | null)[] = [];
     server.use(
       http.get(
         "https://api.github.com/repos/owner/repo/actions/runs",
         ({ request }) => {
           seenIfNoneMatch.push(request.headers.get("if-none-match"));
+          seenIfModifiedSince.push(request.headers.get("if-modified-since"));
+          seenCacheControl.push(request.headers.get("cache-control"));
           return HttpResponse.json(
             {
               total_count: 1,
@@ -252,31 +390,17 @@ describe("fetchWorkflowRuns", () => {
       ),
     );
 
-    const cache = new EtagCache();
-    const octokit = makeOctokit();
-    installEtagHook(octokit, cache);
-
-    // Prime cache with a stale ETag for this URL — a conditional request
-    // would 304 here and return the empty stale body.
-    const key = EtagCache.keyFor({
-      method: "GET",
-      url: "/repos/{owner}/{repo}/actions/runs",
-      owner: "owner",
-      repo: "repo",
-      per_page: 100,
-    });
-    cache.set(key, {
-      etag: '"runs-v1"',
-      data: { total_count: 0, workflow_runs: [] },
-    });
-
-    const runs = await fetchWorkflowRuns(octokit, "owner", "repo");
+    const runs = await fetchWorkflowRuns(
+      createRunsOctokit("test-token"),
+      "owner",
+      "repo",
+    );
 
     expect(seenIfNoneMatch).toEqual([null]);
+    expect(seenIfModifiedSince).toEqual([null]);
+    expect(seenCacheControl).toEqual(["no-cache"]);
     expect(runs).toHaveLength(1);
     expect(runs[0].status).toBe("in_progress");
-    // Cache should be refreshed with the new ETag for any future opt-in caller.
-    expect(cache.get(key)?.etag).toBe('"runs-v2"');
   });
 
   it("computes duration for completed runs", async () => {
@@ -339,5 +463,68 @@ describe("fetchActiveWorkflowIds", () => {
     const ids = await fetchActiveWorkflowIds(makeOctokit(), "owner", "repo");
     expect(ids).toEqual(new Set([100, 200]));
     expect(ids.has(300)).toBe(false);
+  });
+
+  it("collects active workflow IDs across multiple pages", async () => {
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/workflows",
+        ({ request }) => {
+          const page = new URL(request.url).searchParams.get("page");
+          const workflows =
+            page === "2"
+              ? [{ id: 101, state: "active" }]
+              : Array.from({ length: 100 }, (_, index) => ({
+                  id: index + 1,
+                  state: index === 50 ? "disabled_manually" : "active",
+                }));
+          return HttpResponse.json({ total_count: 101, workflows });
+        },
+      ),
+    );
+
+    const ids = await fetchActiveWorkflowIds(makeOctokit(), "owner", "repo");
+
+    expect(ids).toHaveLength(100);
+    expect(ids.has(51)).toBe(false);
+    expect(ids.has(101)).toBe(true);
+  });
+
+  it("preserves workflow IDs across repeated ETag-backed 304 responses", async () => {
+    const etag = '"workflows-v1"';
+    let requests = 0;
+    server.use(
+      http.get(
+        "https://api.github.com/repos/owner/repo/actions/workflows",
+        ({ request }) => {
+          requests++;
+          if (request.headers.get("if-none-match") === etag) {
+            return new HttpResponse(null, { status: 304 });
+          }
+          return HttpResponse.json(
+            {
+              total_count: 2,
+              workflows: [
+                { id: 100, state: "active" },
+                { id: 200, state: "active" },
+              ],
+            },
+            { headers: { etag } },
+          );
+        },
+      ),
+    );
+
+    const octokit = makeOctokit();
+    const cache = new EtagCache();
+    installEtagHook(octokit, cache);
+
+    for (let i = 0; i < 3; i++) {
+      expect(await fetchActiveWorkflowIds(octokit, "owner", "repo")).toEqual(
+        new Set([100, 200]),
+      );
+    }
+    expect(requests).toBe(3);
+    expect(cache.hits()).toBe(2);
   });
 });

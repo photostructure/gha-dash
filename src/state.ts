@@ -6,6 +6,7 @@ import { EtagCache, installEtagHook } from "./services/etagCache.js";
 import type { RepoStats } from "./services/github.js";
 import {
   createOctokit,
+  createRunsOctokit,
   extractToken,
   fetchActiveWorkflowIds,
   fetchAllRuns,
@@ -23,7 +24,10 @@ import type { AppConfig, WorkflowRun } from "./types.js";
 
 export interface AppState {
   config: AppConfig;
+  /** Cached client for repository/workflow metadata and rate-limit calls. */
   octokit: Octokit;
+  /** Uncached client used only for current Actions-run state. */
+  runsOctokit: Octokit;
   etagCache: EtagCache;
   username: string;
   cache: Cache<WorkflowRun[]>;
@@ -45,7 +49,7 @@ export const stateEvents = new EventEmitter();
 let refreshPromise: Promise<void> | null = null;
 let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
 let fullRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
-const FULL_REFRESH_COUNTED_CALLS_PER_REPO = 2;
+const BASELINE_COUNTED_CALLS_PER_REPO = 2;
 
 export function getAppState(): AppState {
   if (!state)
@@ -56,6 +60,7 @@ export function getAppState(): AppState {
 export async function initAppState(): Promise<AppState> {
   const token = extractToken();
   const octokit = createOctokit(token);
+  const runsOctokit = createRunsOctokit(token);
   const etagCache = new EtagCache();
   installEtagHook(octokit, etagCache);
 
@@ -79,6 +84,7 @@ export async function initAppState(): Promise<AppState> {
   state = {
     config,
     octokit,
+    runsOctokit,
     etagCache,
     username: user.login,
     cache,
@@ -154,12 +160,16 @@ async function doRefresh(): Promise<void> {
     const maxRepos = computeBudget(state, repos.length);
 
     const { runs, stats, errors, discoveredBranches, workflowIds } =
-      await fetchAllRuns(state.octokit, repos, state.config.branches, maxRepos);
+      await fetchAllRuns(
+        state.octokit,
+        state.runsOctokit,
+        repos,
+        state.config.branches,
+        maxRepos,
+      );
 
     for (const [repo, repoRuns] of runs) {
-      if (repoRuns.length > 0) {
-        state.cache.set(repo, repoRuns);
-      }
+      state.cache.set(repo, repoRuns);
     }
 
     for (const [repo, repoStats] of stats) {
@@ -230,6 +240,7 @@ async function doRefresh(): Promise<void> {
       try {
         const newToken = extractToken();
         state.octokit = createOctokit(newToken);
+        state.runsOctokit = createRunsOctokit(newToken);
         installEtagHook(state.octokit, state.etagCache);
         console.log("Re-extracted GitHub token after 401");
       } catch {
@@ -250,8 +261,9 @@ async function doRefresh(): Promise<void> {
 
 /**
  * Compute how many repos we can refresh this cycle based on rate limit budget.
- * Full refresh always spends two counted calls per repo: PR stats and runs.
- * Other repo/workflow requests are conditional and only count on ETag misses.
+ * Full refresh spends at least two counted calls per repo: PR stats and runs.
+ * Active runs add check-suite calls after the baseline budget is calculated;
+ * other repo/workflow requests are conditional and count only on ETag misses.
  * Returns undefined if no budget constraint applies (fetch all).
  */
 export function computeBudget(
@@ -269,7 +281,7 @@ export function computeBudget(
   const available = Math.min(remaining - floor, budgetFromPct);
 
   const affordableRepos = Math.floor(
-    available / FULL_REFRESH_COUNTED_CALLS_PER_REPO,
+    available / BASELINE_COUNTED_CALLS_PER_REPO,
   );
 
   if (affordableRepos >= totalRepos) return undefined; // Can afford all repos
@@ -389,26 +401,28 @@ export async function refreshRepo(fullName: string): Promise<void> {
     state.repoStats.set(fullName, repoStats);
     state.workflowIds.set(fullName, activeIds);
 
-    const runs = await fetchWorkflowRuns(state.octokit, owner, repo, activeIds);
+    const runs = await fetchWorkflowRuns(
+      state.runsOctokit,
+      owner,
+      repo,
+      activeIds,
+    );
 
-    if (runs.length > 0) {
-      state.cache.set(fullName, runs);
-      await state.cache.saveToDisk();
+    state.cache.set(fullName, runs);
+    await state.cache.saveToDisk();
 
-      // Update duration history from completed runs
-      const completed = runs.filter(
-        (r) => r.status === "completed" && r.duration > 0,
-      );
-      const updatedDurations = updateDurationHistory(
-        state.config.workflowDurations,
-        completed,
-      );
-      if (updatedDurations) {
-        state.config.workflowDurations = updatedDurations;
-        await writeConfig(state.config);
-      }
+    // Update duration history from completed runs
+    const completed = runs.filter(
+      (r) => r.status === "completed" && r.duration > 0,
+    );
+    const updatedDurations = updateDurationHistory(
+      state.config.workflowDurations,
+      completed,
+    );
+    if (updatedDurations) {
+      state.config.workflowDurations = updatedDurations;
+      await writeConfig(state.config);
     }
-    // If runs is empty, keep existing cache — don't delete what we had
   } catch (err) {
     state.cache.setError(fullName, (err as Error).message);
   }
@@ -418,7 +432,8 @@ export async function refreshRepo(fullName: string): Promise<void> {
  * Targeted active-poll refresh for a single repo. Only fetches workflow runs
  * — skips repo metadata, workflow list, and PR/issue stats since none of
  * those change at the active-poll cadence (every ~15s while a run is in
- * flight). Drops 4 API calls per repo to 1 vs. refreshRepo().
+ * flight). Fetches runs plus the check suite for each active run, while
+ * skipping repo metadata, workflow lists, and PR/issue stats.
  *
  * Uses state.workflowIds (captured during the most recent full refresh) to
  * filter out runs for deleted workflows. If a repo has no cached workflowIds
@@ -432,23 +447,26 @@ export async function refreshRepoActive(fullName: string): Promise<void> {
   const cachedIds = state.workflowIds.get(fullName);
 
   try {
-    const runs = await fetchWorkflowRuns(state.octokit, owner, repo, cachedIds);
+    const runs = await fetchWorkflowRuns(
+      state.runsOctokit,
+      owner,
+      repo,
+      cachedIds,
+    );
 
-    if (runs.length > 0) {
-      state.cache.set(fullName, runs);
-      await state.cache.saveToDisk();
+    state.cache.set(fullName, runs);
+    await state.cache.saveToDisk();
 
-      const completed = runs.filter(
-        (r) => r.status === "completed" && r.duration > 0,
-      );
-      const updatedDurations = updateDurationHistory(
-        state.config.workflowDurations,
-        completed,
-      );
-      if (updatedDurations) {
-        state.config.workflowDurations = updatedDurations;
-        await writeConfig(state.config);
-      }
+    const completed = runs.filter(
+      (r) => r.status === "completed" && r.duration > 0,
+    );
+    const updatedDurations = updateDurationHistory(
+      state.config.workflowDurations,
+      completed,
+    );
+    if (updatedDurations) {
+      state.config.workflowDurations = updatedDurations;
+      await writeConfig(state.config);
     }
   } catch (err) {
     state.cache.setError(fullName, (err as Error).message);

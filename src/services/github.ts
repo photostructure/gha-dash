@@ -27,6 +27,27 @@ export function createOctokit(token: string): Octokit {
   return new Octokit({ auth: token });
 }
 
+/**
+ * Create the Actions-runs client. Runs are monitoring state, so every request
+ * must bypass conditional and intermediary caches; see issue #4.
+ */
+export function createRunsOctokit(token: string): Octokit {
+  const octokit = createOctokit(token);
+
+  octokit.hook.before("request", (options) => {
+    const headers = { ...options.headers } as Record<string, string>;
+    for (const name of Object.keys(headers)) {
+      if (/^(if-none-match|if-modified-since)$/i.test(name)) {
+        delete headers[name];
+      }
+    }
+    headers["cache-control"] = "no-cache";
+    options.headers = headers as typeof options.headers;
+  });
+
+  return octokit;
+}
+
 export async function fetchAuthenticatedUser(
   octokit: Octokit,
 ): Promise<string> {
@@ -137,52 +158,93 @@ export async function fetchActiveWorkflowIds(
   owner: string,
   repo: string,
 ): Promise<Set<number>> {
-  const workflows = await octokit.paginate(octokit.actions.listRepoWorkflows, {
-    owner,
-    repo,
-    per_page: 100,
-  });
-  return new Set(
-    workflows.filter((w) => w.state === "active").map((w) => w.id),
-  );
+  const ids = new Set<number>();
+  let page = 1;
+
+  // Do not use octokit.paginate here. It mutates response.data while
+  // normalizing the workflows collection, which also mutates the ETag hook's
+  // cached object and turns later 304 responses into an empty collection.
+  while (true) {
+    const { data } = await octokit.actions.listRepoWorkflows({
+      owner,
+      repo,
+      per_page: 100,
+      page,
+    });
+
+    for (const workflow of data.workflows) {
+      if (workflow.state === "active") ids.add(workflow.id);
+    }
+
+    if (data.workflows.length < 100 || page * 100 >= data.total_count) break;
+    page++;
+  }
+
+  return ids;
 }
 
 /**
  * Fetch workflow runs for a repo. Returns all active runs (queued, in_progress,
- * waiting, pending) plus the latest completed run per workflow. If
+ * waiting, pending, requested) plus the latest completed run per workflow. If
  * activeWorkflowIds is provided, filters out runs for deleted/disabled workflows.
  */
 export async function fetchWorkflowRuns(
-  octokit: Octokit,
+  runsOctokit: Octokit,
   owner: string,
   repo: string,
   activeWorkflowIds?: Set<number>,
 ): Promise<WorkflowRun[]> {
-  // Observed in production: conditional requests against this endpoint can
-  // return 304 while an individual run's status has actually changed on
-  // GitHub (e.g. queued → in_progress, or a brand-new run that just started),
-  // so the dashboard stays stale for the lifetime of the run. Root cause
-  // unclear — could be coarse ETag generation upstream, a CDN edge serving a
-  // stale ETag, or something else. Either way, the endpoint can't be trusted
-  // with If-None-Match, so we always bypass the ETag cache here. We still
-  // record the response's fresh ETag for any future caller that does opt in.
-  const { data } = await octokit.actions.listWorkflowRunsForRepo({
+  // This endpoint has served stale queued/in_progress bodies under conditional
+  // requests. Callers pass the dedicated client that has no ETag hook.
+  const { data } = await runsOctokit.actions.listWorkflowRunsForRepo({
     owner,
     repo,
     per_page: 100,
-    headers: { [SKIP_ETAG_CACHE_HEADER]: "1" },
   });
+
+  // GitHub's workflow-run aggregate can lag the check suite that drives the
+  // web UI. Resolve active runs through the suite so a run whose jobs have
+  // started is not left as queued, and a finished run is not left in progress.
+  // Fall back to the workflow-run response if suite access fails.
+  const suiteLimit = pLimit(API_CONCURRENCY);
+  const resolvedRuns = await Promise.all(
+    data.workflow_runs.map(async (run) => {
+      let status = run.status;
+      let conclusion = run.conclusion;
+      let updatedAt = run.updated_at;
+      const checkSuiteId = run.check_suite_id;
+
+      if (ACTIVE_STATUSES.has(status ?? "") && checkSuiteId) {
+        try {
+          const { data: suite } = await suiteLimit(() =>
+            runsOctokit.checks.getSuite({
+              owner,
+              repo,
+              check_suite_id: checkSuiteId,
+            }),
+          );
+          status = suite.status ?? status;
+          conclusion = suite.conclusion ?? conclusion;
+          updatedAt = suite.updated_at ?? updatedAt;
+        } catch {
+          // The Actions read permission may not include check-suite access.
+        }
+      }
+
+      return { run, status, conclusion, updatedAt };
+    }),
+  );
 
   // Keep all active runs + latest completed run per workflow.
   // Runs are sorted newest-first by the API.
   const results: WorkflowRun[] = [];
   const seenCompleted = new Set<number>();
 
-  for (const run of data.workflow_runs) {
+  for (const { run, status, conclusion, updatedAt } of resolvedRuns) {
     // Skip deleted/disabled workflows
     if (activeWorkflowIds && !activeWorkflowIds.has(run.workflow_id)) continue;
 
-    const isActive = ACTIVE_STATUSES.has(run.status ?? "");
+    const isActive = ACTIVE_STATUSES.has(status ?? "");
 
     // For completed runs, keep only the latest per workflow
     if (!isActive) {
@@ -191,8 +253,8 @@ export async function fetchWorkflowRuns(
     }
 
     const duration =
-      run.status === "completed" && run.updated_at
-        ? new Date(run.updated_at).getTime() -
+      status === "completed" && updatedAt
+        ? new Date(updatedAt).getTime() -
           new Date(run.run_started_at ?? run.created_at).getTime()
         : Date.now() - new Date(run.run_started_at ?? run.created_at).getTime();
 
@@ -210,8 +272,8 @@ export async function fetchWorkflowRuns(
       workflowId: run.workflow_id,
       workflowName,
       repo: `${owner}/${repo}`,
-      status: run.status as WorkflowRun["status"],
-      conclusion: (run.conclusion as WorkflowRun["conclusion"]) ?? null,
+      status: status as WorkflowRun["status"],
+      conclusion: (conclusion as WorkflowRun["conclusion"]) ?? null,
       branch: run.head_branch ?? "unknown",
       commitSha: run.head_sha.slice(0, 7),
       commitMessage: run.display_title ?? "",
@@ -242,14 +304,15 @@ export interface FetchResult {
 
 /**
  * Fetch runs for repos in parallel, capped at API_CONCURRENCY.
- * In steady state, each repo costs 2 counted API calls: one uncached
- * pulls.list request for PR counts, and one uncached actions/runs request.
- * Repo metadata and active workflows use conditional requests, so they only
- * count against quota on ETag misses.
+ * In steady state, each repo costs 2 baseline counted API calls: one uncached
+ * pulls.list request and one uncached actions/runs request. Each active run
+ * adds one uncached check-suite request so status matches GitHub's web UI.
+ * Repo metadata and active workflows use conditional requests.
  * If maxRepos is set, only fetches that many repos (for budget throttling).
  */
 export async function fetchAllRuns(
   octokit: Octokit,
+  runsOctokit: Octokit,
   repos: string[],
   cachedBranches: Record<string, string>,
   maxRepos?: number,
@@ -294,7 +357,7 @@ export async function fetchAllRuns(
           ]);
 
           const result = await fetchWorkflowRuns(
-            octokit,
+            runsOctokit,
             owner,
             repo,
             activeIds,

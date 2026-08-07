@@ -121,11 +121,10 @@ export function installEtagHook(octokit: Octokit, cache: EtagCache): void {
     }
 
     // Per-request opt-out: caller passes the skip header to bypass the
-    // conditional If-None-Match (because they must see ground truth — e.g.
-    // actions runs list, whose ETag lags status transitions). Strip the
-    // marker before it goes out so it doesn't reach GitHub. We still cache
-    // the fresh 200 response below, so later refreshes benefit from the
-    // updated ETag.
+    // conditional If-None-Match when a caller must see ground truth. Strip the
+    // marker before it goes out so it doesn't reach GitHub. We still cache the
+    // fresh 200 response below, so later refreshes benefit from the updated
+    // ETag. Actions runs use a separate uncached client entirely.
     let skipCache = false;
     if (
       options.headers &&
