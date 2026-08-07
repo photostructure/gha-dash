@@ -61,5 +61,17 @@ describe("displayStatus", () => {
 
   it("shows status for pending runs", () => {
     expect(displayStatus(run("pending", null))).toBe("pending");
+    expect(displayStatus(run("requested", null))).toBe("requested");
+  });
+
+  it("shows all documented conclusions for completed runs", () => {
+    expect(displayStatus(run("completed", "action_required"))).toBe(
+      "action_required",
+    );
+    expect(displayStatus(run("completed", "startup_failure"))).toBe(
+      "startup_failure",
+    );
+    expect(displayStatus(run("completed", "neutral"))).toBe("neutral");
+    expect(displayStatus(run("completed", "stale"))).toBe("stale");
   });
 });

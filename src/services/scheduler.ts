@@ -5,6 +5,7 @@ export const ACTIVE_STATUSES = new Set([
   "in_progress",
   "waiting",
   "pending",
+  "requested",
 ]);
 export const MIN_REFRESH_INTERVAL_MS = 15_000;
 export const DEFAULT_EXPECTED_DURATION_MS = 300_000; // 5 minutes

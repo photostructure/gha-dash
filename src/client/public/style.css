@@ -300,12 +300,15 @@ th.sort-desc::after {
 .dot-success {
   background: var(--success);
 }
-.dot-failure {
+.dot-failure,
+.dot-action_required,
+.dot-startup_failure {
   background: var(--failure);
 }
 .dot-queued,
 .dot-waiting,
-.dot-pending {
+.dot-pending,
+.dot-requested {
   background: var(--pending);
 }
 .dot-in_progress {
@@ -323,7 +326,9 @@ th.sort-desc::after {
   animation: spin 1s linear infinite;
 }
 .dot-cancelled,
+.dot-neutral,
 .dot-skipped,
+.dot-stale,
 .dot-timed_out {
   background: var(--neutral);
 }
@@ -380,14 +385,17 @@ th.sort-desc::after {
   background: var(--success-bg);
   color: var(--success);
 }
-.status-failure {
+.status-failure,
+.status-action_required,
+.status-startup_failure {
   background: var(--failure-bg);
   color: var(--failure);
 }
 .status-in_progress,
 .status-queued,
 .status-waiting,
-.status-pending {
+.status-pending,
+.status-requested {
   background: var(--pending-bg);
   color: var(--pending);
 }
@@ -409,7 +417,9 @@ th.sort-desc::after {
   animation: spin 1s linear infinite;
 }
 .status-cancelled,
+.status-neutral,
 .status-skipped,
+.status-stale,
 .status-timed_out {
   background: var(--neutral-bg);
   color: var(--neutral);

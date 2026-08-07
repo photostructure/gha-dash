@@ -126,6 +126,26 @@ describe("computeNextRefresh", () => {
     expect(result.activeRepos).toEqual(["owner/repo"]);
   });
 
+  it("keeps polling runs that GitHub reports as requested", () => {
+    const now = Date.now();
+    const runs = [
+      makeRun({
+        status: "requested",
+        conclusion: null,
+        startedAt: new Date(now).toISOString(),
+      }),
+    ];
+
+    const result = computeNextRefresh(
+      entries("owner/repo", runs),
+      {},
+      configuredInterval,
+      now,
+    );
+
+    expect(result.activeRepos).toEqual(["owner/repo"]);
+  });
+
   it("returns minimum interval when past expected completion", () => {
     const now = Date.now();
     const startedAt = new Date(now - 600_000).toISOString(); // started 10min ago

@@ -39,17 +39,17 @@ export interface WorkflowRun {
 }
 
 export type RunStatus =
-  | "completed"
-  | "in_progress"
-  | "queued"
-  | "waiting"
-  | "pending";
+  "completed" | "in_progress" | "queued" | "waiting" | "pending" | "requested";
 export type RunConclusion =
   | "success"
   | "failure"
   | "cancelled"
   | "skipped"
-  | "timed_out";
+  | "timed_out"
+  | "action_required"
+  | "startup_failure"
+  | "neutral"
+  | "stale";
 
 export interface CacheEntry<T> {
   data: T;
