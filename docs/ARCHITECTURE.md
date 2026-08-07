@@ -32,7 +32,7 @@ Shared context for all gha-dash TPPs. This is a reference doc, not a TPP.
 
 | Layer          | Choice                   | Why                                    |
 | -------------- | ------------------------ | -------------------------------------- |
-| Runtime        | Node.js 20+              | ESM support                            |
+| Runtime        | Node.js 22+              | Supported Node.js release              |
 | Language       | TypeScript (strict, ESM) | `"type": "module"` in package.json     |
 | Server         | Express 5                | Mature, well-known                     |
 | Frontend       | Vue 3 (Composition API)  | Reactive UI, component model           |

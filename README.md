@@ -10,7 +10,7 @@
 
 Local web dashboard for GitHub Actions. See workflow status across all your repos at a glance.
 
-**Only prerequisite:** an authenticated [`gh` CLI](https://cli.github.com/).
+**Prerequisites:** Node.js 22 or later and an authenticated [`gh` CLI](https://cli.github.com/).
 
 ```bash
 npx gha-dash
@@ -66,7 +66,8 @@ gha-dash caches aggressively to stay within GitHub's 5,000 requests/hour limit:
 ```bash
 git clone https://github.com/photostructure/gha-dash
 cd gha-dash
-npm install
+# Dependency resolution requires npm 11.10 or later.
+npm run install:deps
 npm run dev       # starts Express (API on :3131) + Vite (UI on :5173)
 npm test          # vitest
 npm run build     # production build → dist/

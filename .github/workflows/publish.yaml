@@ -1,0 +1,314 @@
+name: Stage npm Release
+run-name: Stage ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage-${{ github.repository }}-${{ github.ref }}
+  # GitHub's default permits one pending run. actionlint 1.7.12 predates
+  # the equivalent explicit "queue: single" syntax.
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate signed release tag
+    runs-on: ubuntu-24.04
+    outputs:
+      package_name: ${{ steps.identity.outputs.package_name }}
+      package_version: ${{ steps.identity.outputs.package_version }}
+      tag_target_sha: ${{ steps.identity.outputs.tag_target_sha }}
+
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tag, versions, and signatures
+        id: identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::This workflow must run at a release tag, not $GITHUB_REF"
+            exit 1
+          fi
+          if [[ ! "$REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Tag $REF_NAME is not a stable vMAJOR.MINOR.PATCH tag"
+            exit 1
+          fi
+
+          PACKAGE_NAME="$(node -p "require('./package.json').name")"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$REF_NAME" != "v$PACKAGE_VERSION" ]]; then
+            echo "::error::Tag $REF_NAME does not match package version $PACKAGE_VERSION"
+            exit 1
+          fi
+
+          node -e '
+            const pkg = require("./package.json")
+            const lock = require("./package-lock.json")
+            const root = lock.packages[""]
+            if (
+              lock.name !== pkg.name ||
+              root.name !== pkg.name ||
+              lock.version !== pkg.version ||
+              root.version !== pkg.version
+            ) {
+              throw new Error("package.json and package-lock.json identity do not match")
+            }
+          '
+
+          TAG_OBJECT_SHA="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$REF_NAME" --jq '.object.sha'
+          )"
+          TAG_OBJECT_TYPE="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$REF_NAME" --jq '.object.type'
+          )"
+          if [[ "$TAG_OBJECT_TYPE" != tag ]]; then
+            echo "::error::Tag $REF_NAME must be annotated, not lightweight"
+            exit 1
+          fi
+
+          TAG_TARGET_TYPE="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_OBJECT_SHA" --jq '.object.type'
+          )"
+          TAG_TARGET_SHA="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_OBJECT_SHA" --jq '.object.sha'
+          )"
+          TAG_VERIFIED="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_OBJECT_SHA" --jq '.verification.verified'
+          )"
+          COMMIT_VERIFIED="$(
+            gh api "repos/$GITHUB_REPOSITORY/commits/$TAG_TARGET_SHA" --jq '.commit.verification.verified'
+          )"
+
+          if [[ "$TAG_TARGET_TYPE" != commit || "$TAG_TARGET_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::Tag $REF_NAME does not point directly to the workflow commit"
+            exit 1
+          fi
+          if [[ "$TAG_VERIFIED" != true || "$COMMIT_VERIFIED" != true ]]; then
+            echo "::error::The release commit and annotated tag must both have verified signatures"
+            exit 1
+          fi
+
+          {
+            echo "package_name=$PACKAGE_NAME"
+            echo "package_version=$PACKAGE_VERSION"
+            echo "tag_target_sha=$TAG_TARGET_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+  pack:
+    name: Build exact npm tarball
+    runs-on: ubuntu-24.04
+    needs: validate
+    env:
+      EXPECTED_PACKAGE: ${{ needs.validate.outputs.package_name }}
+      EXPECTED_VERSION: ${{ needs.validate.outputs.package_version }}
+
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the release Node.js toolchain
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+
+      - name: Verify the release toolchain
+        run: |
+          [[ "$(node --version)" == "v24.19.0" ]]
+          [[ "$(npm --version)" == "11.17.0" ]]
+
+      - name: Install build dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build the package
+        run: npm run build
+
+      - name: Pack and verify the package
+        run: |
+          mkdir package-artifact
+          npm pack \
+            --json \
+            --ignore-scripts \
+            --pack-destination package-artifact \
+            > package-artifact/PACK.json
+
+          jq -e '
+            length == 1 and
+            .[0].name == env.EXPECTED_PACKAGE and
+            .[0].version == env.EXPECTED_VERSION and
+            ([.[0].files[].path] | index("LICENSE") != null) and
+            ([.[0].files[].path] | index("README.md") != null) and
+            ([.[0].files[].path] | index("package.json") != null) and
+            ([.[0].files[].path] | index("dist/cli.js") != null) and
+            ([.[0].files[].path] | index("dist/client/index.html") != null) and
+            ([.[0].files[].path] | index("dist/client/favicon.svg") != null) and
+            ([.[0].files[].path] | index("dist/client/logo.svg") != null) and
+            ([.[0].files[].path] | index("dist/client/style.css") != null) and
+            any(.[0].files[].path; startswith("dist/client/assets/") and endswith(".js")) and
+            all(.[0].files[].path;
+              . == "LICENSE" or
+              . == "README.md" or
+              . == "package.json" or
+              startswith("dist/")
+            )
+          ' package-artifact/PACK.json
+
+          mapfile -t TARBALLS < <(
+            find package-artifact -maxdepth 1 -type f -name '*.tgz' | LC_ALL=C sort
+          )
+          if [[ "${#TARBALLS[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one package tarball, found ${#TARBALLS[@]}"
+            exit 1
+          fi
+          TARBALL="${TARBALLS[0]}"
+          PACK_FILENAME="$(jq -r '.[0].filename' package-artifact/PACK.json)"
+          if [[ "$(basename "$TARBALL")" != "$PACK_FILENAME" ]]; then
+            echo "::error::Pack metadata does not name the generated tarball"
+            exit 1
+          fi
+
+          EMBEDDED_NAME="$(tar -xOf "$TARBALL" package/package.json | jq -r '.name')"
+          EMBEDDED_VERSION="$(tar -xOf "$TARBALL" package/package.json | jq -r '.version')"
+          if [[ "$EMBEDDED_NAME" != "$EXPECTED_PACKAGE" || "$EMBEDDED_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "::error::Packed manifest identity does not match the validated tag"
+            exit 1
+          fi
+
+          tar -tzf "$TARBALL" | LC_ALL=C sort > package-artifact/CONTENTS.txt
+          (
+            cd package-artifact
+            sha256sum -- *.tgz > SHA256SUMS
+          )
+
+      - name: Upload the exact package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: npm-package-${{ github.ref_name }}
+          path: |
+            package-artifact/*.tgz
+            package-artifact/PACK.json
+            package-artifact/CONTENTS.txt
+            package-artifact/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
+
+  stage:
+    name: Stage package on npm
+    runs-on: ubuntu-24.04
+    needs: [validate, pack]
+    permissions:
+      contents: read
+      id-token: write # Exchange GitHub OIDC identity for npm staging access.
+    env:
+      EXPECTED_PACKAGE: ${{ needs.validate.outputs.package_name }}
+      EXPECTED_VERSION: ${{ needs.validate.outputs.package_version }}
+      EXPECTED_TAG_SHA: ${{ needs.validate.outputs.tag_target_sha }}
+      REF_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: Download the exact package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-package-${{ github.ref_name }}
+          path: package-artifact
+
+      - name: Install the release Node.js toolchain
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify the release toolchain
+        run: |
+          [[ "$(node --version)" == "v24.19.0" ]]
+          [[ "$(npm --version)" == "11.17.0" ]]
+
+      - name: Verify the release tag still matches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG_OBJECT_SHA="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$REF_NAME" --jq '.object.sha'
+          )"
+          TAG_OBJECT_TYPE="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$REF_NAME" --jq '.object.type'
+          )"
+          TAG_TARGET_SHA="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_OBJECT_SHA" --jq '.object.sha'
+          )"
+          TAG_VERIFIED="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_OBJECT_SHA" --jq '.verification.verified'
+          )"
+          COMMIT_VERIFIED="$(
+            gh api "repos/$GITHUB_REPOSITORY/commits/$TAG_TARGET_SHA" --jq '.commit.verification.verified'
+          )"
+
+          if [[ "$TAG_OBJECT_TYPE" != tag || "$TAG_TARGET_SHA" != "$EXPECTED_TAG_SHA" || "$TAG_TARGET_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::Tag $REF_NAME moved or no longer points directly to the validated commit"
+            exit 1
+          fi
+          if [[ "$TAG_VERIFIED" != true || "$COMMIT_VERIFIED" != true ]]; then
+            echo "::error::Tag $REF_NAME or its commit lost verified-signature status"
+            exit 1
+          fi
+
+      - name: Verify and stage the npm package
+        run: |
+          mapfile -t ARTIFACT_FILES < <(
+            find package-artifact -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort
+          )
+          if [[ "${#ARTIFACT_FILES[@]}" -ne 4 ]]; then
+            echo "::error::Expected four package artifact files, found ${#ARTIFACT_FILES[@]}"
+            printf '%s\n' "${ARTIFACT_FILES[@]}"
+            exit 1
+          fi
+
+          (
+            cd package-artifact
+            sha256sum --check SHA256SUMS
+          )
+
+          mapfile -t TARBALLS < <(
+            find package-artifact -maxdepth 1 -type f -name '*.tgz' | LC_ALL=C sort
+          )
+          if [[ "${#TARBALLS[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one package tarball, found ${#TARBALLS[@]}"
+            exit 1
+          fi
+          TARBALL="${TARBALLS[0]}"
+
+          jq -e '
+            length == 1 and
+            .[0].name == env.EXPECTED_PACKAGE and
+            .[0].version == env.EXPECTED_VERSION
+          ' package-artifact/PACK.json
+          if [[ "$(basename "$TARBALL")" != "$(jq -r '.[0].filename' package-artifact/PACK.json)" ]]; then
+            echo "::error::Pack metadata does not name the downloaded tarball"
+            exit 1
+          fi
+
+          EMBEDDED_NAME="$(tar -xOf "$TARBALL" package/package.json | jq -r '.name')"
+          EMBEDDED_VERSION="$(tar -xOf "$TARBALL" package/package.json | jq -r '.version')"
+          if [[ "$EMBEDDED_NAME" != "$EXPECTED_PACKAGE" || "$EMBEDDED_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "::error::Downloaded package identity does not match the validated tag"
+            exit 1
+          fi
+
+          tar -tzf "$TARBALL" | LC_ALL=C sort > "$RUNNER_TEMP/CONTENTS.txt"
+          cmp package-artifact/CONTENTS.txt "$RUNNER_TEMP/CONTENTS.txt"
+
+          # A bare relative tarball path is parsed as hosted Git shorthand.
+          npm stage publish "./$TARBALL" --ignore-scripts

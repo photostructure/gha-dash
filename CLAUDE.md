@@ -11,9 +11,9 @@ Licensed under Apache 2.0.
 ## Quick Start
 
 ```bash
-npm install
+npm run install:deps
 npm run dev       # Express (tsx watch) + Vite dev server
-npm test          # vitest (56 tests)
+npm test          # vitest
 npm run build     # tsup (server) + vite (client) → dist/
 make preflight    # fmt + lint + build + test: run before a release
 ```
@@ -23,7 +23,7 @@ Production: `node dist/cli.js` serves Vue SPA + API on :3131.
 
 ## Tech Stack
 
-- **Runtime**: Node.js 20+, TypeScript (strict, ESM — `"type": "module"`)
+- **Runtime**: Node.js 22+, TypeScript (strict, ESM — `"type": "module"`)
 - **Server**: Express 5, JSON API routes
 - **Frontend**: Vue 3 (Composition API, `<script setup>`), vue-router, Vite
 - **GitHub API**: @octokit/rest, auth via `gh auth token`
@@ -139,12 +139,16 @@ Config tests stub both `XDG_CONFIG_HOME` and `APPDATA` for cross-platform.
 
 ## CI & Publishing
 
-`.github/workflows/build.yml`:
+See `docs/RELEASING.md` for the maintainer release procedure.
 
-- **Push/PR**: Build matrix (ubuntu/macos/windows × node 20/22/24)
-- **Manual dispatch**: Version bump, SSH-signed tag, GitHub release, npm publish
-  with OIDC provenance. Requires secrets: `SSH_SIGNING_KEY`, `GIT_USER_NAME`,
-  `GIT_USER_EMAIL`.
+- `build.yml` validates Node 22/24/26 on Ubuntu, macOS, and Windows, then
+  creates a signed release commit and tag after manual dispatch.
+- `publish.yaml` validates and packs that exact tag, then stages it on npm
+  with OIDC.
+- `release.yaml` creates the immutable GitHub release only after a maintainer
+  approves the npm stage with 2FA.
+- Signing requires `SSH_SIGNING_KEY`, `GIT_USER_NAME`, and `GIT_USER_EMAIL`;
+  no npm publishing token is permitted.
 
 ## Gotchas / Lore
 

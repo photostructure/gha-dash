@@ -18,8 +18,10 @@
     "fmt": "prettier --write .",
     "fmt:check": "prettier --check .",
     "lint": "eslint src/",
-    "update": "run-p update:*",
-    "update:ncu": "npm-check-updates --upgrade --install always",
+    "check:npm": "node scripts/check-npm-version.mjs",
+    "install:deps": "node scripts/check-npm-version.mjs && npm install --ignore-scripts",
+    "update": "node scripts/check-npm-version.mjs && run-p update:*",
+    "update:ncu": "node scripts/check-npm-version.mjs && npm-check-updates --upgrade --install always",
     "install:pinact": "go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@latest",
     "update:pinact": "pinact run -u",
     "preflight": "npm run update && npm run fmt && npm run lint && npm run build && npm run test"
@@ -41,7 +43,7 @@
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
