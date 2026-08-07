@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0 (2026-08-07)
+
+### Features
+
+- **Refresh repository list** — Settings can rediscover accessible repositories without changing selected repos.
+
+### Fixes
+
+- **Accurate workflow status** — The dashboard now reconciles GitHub's run and check-suite state instead of replaying stale cached responses.
+- **Complete state handling** — Obsolete rows are cleared, `requested` runs keep polling, and all GitHub conclusions render correctly.
+
+### Maintenance
+
+- Updated dependencies and pinned CI actions; added a standard `make preflight` release check.
+
 ## 0.8.2 (2026-04-27)
 
 ### Fixes
