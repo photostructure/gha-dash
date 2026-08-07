@@ -25,6 +25,7 @@ cache.set("owner/repo", [mockRun]);
 const mockUpdateConfig = vi.fn();
 const mockRefreshRuns = vi.fn();
 const mockRefreshRepo = vi.fn();
+const mockRefreshAvailableRepos = vi.fn();
 
 // Minimal EventEmitter for SSE tests
 const { EventEmitter } = await import("node:events");
@@ -53,6 +54,8 @@ vi.mock("../../state.js", () => ({
   refreshing: false,
   stateEvents: mockStateEvents,
   updateConfig: (...args: unknown[]) => mockUpdateConfig(...args),
+  refreshAvailableRepos: (...args: unknown[]) =>
+    mockRefreshAvailableRepos(...args),
   refreshRuns: (...args: unknown[]) => mockRefreshRuns(...args),
   refreshRepo: (...args: unknown[]) => mockRefreshRepo(...args),
 }));
@@ -67,6 +70,7 @@ describe("API routes", () => {
     mockUpdateConfig.mockReset();
     mockRefreshRuns.mockReset();
     mockRefreshRepo.mockReset();
+    mockRefreshAvailableRepos.mockReset();
     app = createApp();
   });
 
@@ -103,6 +107,14 @@ describe("API routes", () => {
       }),
     );
     expect(mockRefreshRuns).toHaveBeenCalled();
+  });
+
+  it("POST /api/config/repos/refresh re-discovers repositories", async () => {
+    const res = await request(app).post("/api/config/repos/refresh");
+
+    expect(res.status).toBe(200);
+    expect(res.body.availableRepos).toEqual(["owner/repo", "owner/other"]);
+    expect(mockRefreshAvailableRepos).toHaveBeenCalledOnce();
   });
 
   it("POST /api/refresh triggers refresh and returns data", async () => {

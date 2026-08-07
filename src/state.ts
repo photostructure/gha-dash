@@ -493,6 +493,19 @@ export function __setStateForTests(s: AppState | null): void {
   state = s;
 }
 
+/** Re-discover repositories without changing the user's selected repos. */
+export async function refreshAvailableRepos(): Promise<void> {
+  if (!state) return;
+
+  const discovered = await fetchUserRepos(state.octokit, true);
+  const discoveredSet = new Set(discovered);
+  const selectedOnly = state.config.repos.filter(
+    (repo) => !discoveredSet.has(repo),
+  );
+  state.config.availableRepos = [...discovered, ...selectedOnly];
+  await writeConfig(state.config);
+}
+
 export async function updateConfig(updates: Partial<AppConfig>): Promise<void> {
   if (!state) return;
 

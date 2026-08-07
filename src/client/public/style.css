@@ -550,6 +550,41 @@ th.sort-desc::after {
   border-color: var(--text-muted);
 }
 
+.btn-refresh-repos {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.btn-refresh-repos:hover:not(:disabled) {
+  color: var(--link);
+  border-color: var(--link);
+}
+
+.btn-refresh-repos:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.empty-repos {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.empty-repos .hint {
+  margin: 0;
+}
+
+.error-text {
+  color: var(--failure);
+}
+
 .settings-table {
   width: 100%;
   border-collapse: collapse;

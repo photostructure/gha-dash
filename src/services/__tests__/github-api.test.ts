@@ -7,6 +7,7 @@ import {
   createRunsOctokit,
   fetchActiveWorkflowIds,
   fetchRepoMeta,
+  fetchUserRepos,
   fetchWorkflowRuns,
 } from "../github.js";
 
@@ -81,6 +82,27 @@ describe("fetchRepoMeta", () => {
     const meta = await fetchRepoMeta(makeOctokit(), "owner", "repo");
     expect(meta.defaultBranch).toBe("develop");
     expect(meta.openIssuesAndPrs).toBe(7);
+  });
+});
+
+describe("fetchUserRepos", () => {
+  it("bypasses cached metadata during an explicit repo-list refresh", async () => {
+    const seenIfNoneMatch: (string | null)[] = [];
+    server.use(
+      http.get("https://api.github.com/user/repos", ({ request }) => {
+        seenIfNoneMatch.push(request.headers.get("if-none-match"));
+        return HttpResponse.json([{ id: 1, full_name: "owner/repo" }], {
+          headers: { etag: '"repos-v1"' },
+        });
+      }),
+    );
+
+    const octokit = makeOctokit();
+    installEtagHook(octokit, new EtagCache());
+
+    expect(await fetchUserRepos(octokit, true)).toEqual(["owner/repo"]);
+    expect(await fetchUserRepos(octokit, true)).toEqual(["owner/repo"]);
+    expect(seenIfNoneMatch).toEqual([null, null]);
   });
 });
 

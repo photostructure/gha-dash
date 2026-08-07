@@ -62,13 +62,28 @@ export async function fetchUserOrgs(octokit: Octokit): Promise<string[]> {
   return orgs.map((o) => o.login);
 }
 
-export async function fetchUserRepos(octokit: Octokit): Promise<string[]> {
-  const repos = await octokit.paginate(octokit.repos.listForAuthenticatedUser, {
-    per_page: 100,
-    affiliation: "owner,organization_member",
-    sort: "pushed",
-  });
-  return repos.map((r) => r.full_name);
+export async function fetchUserRepos(
+  octokit: Octokit,
+  fresh = false,
+): Promise<string[]> {
+  const repos: string[] = [];
+  let page = 1;
+
+  while (true) {
+    const { data } = await octokit.repos.listForAuthenticatedUser({
+      per_page: 100,
+      page,
+      affiliation: "owner,organization_member",
+      sort: "pushed",
+      ...(fresh ? { headers: { [SKIP_ETAG_CACHE_HEADER]: "1" } } : undefined),
+    });
+    repos.push(...data.map((repo) => repo.full_name));
+
+    if (data.length < 100) break;
+    page++;
+  }
+
+  return repos;
 }
 
 export async function fetchOrgRepos(

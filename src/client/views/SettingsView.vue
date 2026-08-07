@@ -4,7 +4,15 @@ import { useRouter } from "vue-router";
 import { useConfig } from "../composables/useConfig";
 
 const router = useRouter();
-const { config, loading, saving, saveConfig } = useConfig();
+const {
+  config,
+  loading,
+  saving,
+  refreshingRepos,
+  repoRefreshError,
+  saveConfig,
+  refreshAvailableRepos,
+} = useConfig();
 
 // Local form state
 const selectedRepos = ref<Set<string>>(new Set());
@@ -161,6 +169,14 @@ async function save() {
               <button type="button" @click="checkNone">None</button>
               <button type="button" @click="checkInverse">Invert</button>
             </div>
+            <button
+              type="button"
+              class="btn-refresh-repos"
+              :disabled="refreshingRepos"
+              @click="refreshAvailableRepos"
+            >
+              {{ refreshingRepos ? "Refreshing..." : "Refresh repo list" }}
+            </button>
           </div>
           <table class="settings-table">
             <thead>
@@ -204,8 +220,19 @@ async function save() {
           </table>
         </div>
       </details>
-      <p v-else class="hint">
-        No repos discovered yet &mdash; refresh the dashboard first.
+      <div v-else class="empty-repos">
+        <p class="hint">No repos discovered yet.</p>
+        <button
+          type="button"
+          class="btn-refresh-repos"
+          :disabled="refreshingRepos"
+          @click="refreshAvailableRepos"
+        >
+          {{ refreshingRepos ? "Refreshing..." : "Refresh repo list" }}
+        </button>
+      </div>
+      <p v-if="repoRefreshError" class="error-text">
+        Could not refresh repositories: {{ repoRefreshError }}
       </p>
 
       <details open>

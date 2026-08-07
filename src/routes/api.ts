@@ -3,6 +3,7 @@ import { dispatchWorkflow, getDispatchInfo } from "../services/dispatch.js";
 import { groupRunsByRepo } from "../services/workflows.js";
 import {
   getAppState,
+  refreshAvailableRepos,
   refreshing,
   refreshRepo,
   refreshRuns,
@@ -55,6 +56,16 @@ export function apiRoutes(): Router {
   router.get("/config", (_req, res) => {
     const state = getAppState();
     res.json(state.config);
+  });
+
+  // POST /api/config/repos/refresh — re-discover accessible repositories
+  router.post("/config/repos/refresh", async (_req, res, next) => {
+    try {
+      await refreshAvailableRepos();
+      res.json(getAppState().config);
+    } catch (err) {
+      next(err);
+    }
   });
 
   // PUT /api/config — update configuration
@@ -232,8 +243,7 @@ function findRun(
   const state = getAppState();
   const fullName = `${owner}/${repo}`;
   const entry = state.cache.get(fullName) as
-    | CacheEntry<WorkflowRun[]>
-    | undefined;
+    CacheEntry<WorkflowRun[]> | undefined;
   if (!entry) return undefined;
   return entry.data.find((r) => r.workflowId === workflowId);
 }
