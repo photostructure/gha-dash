@@ -22,7 +22,7 @@
     "update:ncu": "npm-check-updates --upgrade --install always",
     "install:pinact": "go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@latest",
     "update:pinact": "pinact run -u",
-    "preflight": "run-s update fmt lint build test"
+    "preflight": "npm run update && npm run fmt && npm run lint && npm run build && npm run test"
   },
   "keywords": [
     "github",
