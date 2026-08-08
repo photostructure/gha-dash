@@ -66,7 +66,8 @@ gha-dash caches aggressively to stay within GitHub's 5,000 requests/hour limit:
 ```bash
 git clone https://github.com/photostructure/gha-dash
 cd gha-dash
-# Dependency resolution requires npm 11.10 or later.
+# Dependency resolution requires npm 11.10 or later. Node 22 bundles npm 10.x,
+# so run `npm i -g npm@latest` there first.
 npm run install:deps
 npm run dev       # starts Express (API on :3131) + Vite (UI on :5173)
 npm test          # vitest

@@ -195,10 +195,34 @@ jobs:
             echo "::error::Tag $TAG or its commit lost verified-signature status"
             exit 1
           fi
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::GitHub release $TAG already exists"
-            exit 1
-          fi
+          # Assets must be attached before publishing, because publishing is
+          # what freezes an immutable release. A run interrupted between the
+          # two calls below leaves a draft, which is unpublished and has no
+          # consumers, so discarding it keeps this workflow rerunnable.
+          EXISTING_RELEASE="$(
+            gh release view "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft,author \
+              --jq '"\(.isDraft) \(.author.login)"' 2>/dev/null || true
+          )"
+          case "$EXISTING_RELEASE" in
+            "") ;;
+            "true github-actions[bot]")
+              # This workflow authored it, so deleting it only undoes our own
+              # interrupted run. Never pass --cleanup-tag: the signed tag must
+              # survive.
+              echo "::notice::Discarding the incomplete draft release $TAG"
+              gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
+              ;;
+            "true "*)
+              echo "::error::Draft release $TAG was authored by ${EXISTING_RELEASE#true }, not this workflow; resolve it by hand"
+              exit 1
+              ;;
+            *)
+              echo "::error::GitHub release $TAG is already published"
+              exit 1
+              ;;
+          esac
 
           gh release create "$TAG" \
             package-artifact/*.tgz \

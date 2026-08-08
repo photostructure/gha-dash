@@ -63,6 +63,9 @@ npm stage approve STAGE_ID
 | Staging fails before npm accepts the package            | Retry the same tag only for transient infrastructure failures. Release a new version for a workflow defect.                             |
 | The staged contents are wrong                           | Reject the stage with `npm stage reject STAGE_ID`. Preserve the tag and use a new version.                                              |
 | npm approval succeeds but GitHub release creation fails | Rerun `release.yaml` at the same tag while its staging artifact still exists.                                                           |
+| A draft GitHub release remains after an interrupted run | Rerun `release.yaml` at the same tag. It discards its own draft and keeps the signed tag. Do not delete or hand-edit that draft.        |
+| A draft release at the tag was authored by a person     | `release.yaml` refuses to touch it. Decide by hand whether to keep or remove it, then rerun.                                            |
+| The GitHub release published but is not immutable       | Stop and investigate the repository release settings. Never delete a published release; correct it with a new version.                  |
 | The one-day artifact expired                            | Stop. Do not rebuild the release asset independently; review the tagged workflow and choose a recovery that preserves package identity. |
 | A published package is bad                              | Deprecate it or publish a corrected version. Never overwrite it.                                                                        |
 

@@ -11,12 +11,17 @@ Licensed under Apache 2.0.
 ## Quick Start
 
 ```bash
-npm run install:deps
+npm run install:deps   # needs npm >= 11.10; see below
 npm run dev       # Express (tsx watch) + Vite dev server
 npm test          # vitest
 npm run build     # tsup (server) + vite (client) → dist/
 make preflight    # fmt + lint + build + test: run before a release
 ```
+
+Dependency **resolution** requires npm 11.10 or later, which is what enforces
+the `min-release-age` cooldown in `.npmrc`. Node 22 bundles npm 10.x, so run
+`npm i -g npm@latest` there first. Everything else — running, building,
+testing, and `npm ci` against the lockfile — works on any Node 22+ npm.
 
 Dev: open `http://localhost:5173` (Vite proxies API to Express on :3131).
 Production: `node dist/cli.js` serves Vue SPA + API on :3131.
