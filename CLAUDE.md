@@ -148,10 +148,10 @@ See `docs/RELEASING.md` for the maintainer release procedure.
 
 - `build.yml` validates Node 22/24/26 on Ubuntu, macOS, and Windows, then
   creates a signed release commit and tag after manual dispatch.
-- `publish.yaml` validates and packs that exact tag, then stages it on npm
-  with OIDC.
-- `release.yaml` creates the immutable GitHub release only after a maintainer
-  approves the npm stage with 2FA.
+- `publish.yaml` validates and packs that exact tag, stages it on npm with
+  OIDC, then creates the immutable GitHub release automatically.
+- A maintainer reviews and approves the staged npm package with 2FA after the
+  workflows finish.
 - Signing requires `SSH_SIGNING_KEY`, `GIT_USER_NAME`, and `GIT_USER_EMAIL`;
   no npm publishing token is permitted.
 
