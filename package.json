@@ -22,7 +22,7 @@
     "install:deps": "node scripts/check-npm-version.mjs && npm install --ignore-scripts",
     "update": "node scripts/check-npm-version.mjs && run-p update:*",
     "update:ncu": "node scripts/check-npm-version.mjs && npm-check-updates --upgrade --install always",
-    "install:pinact": "go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@latest",
+    "install:pinact": "go install github.com/suzuki-shunsuke/pinact/v4/cmd/pinact@v4.1.0",
     "update:pinact": "pinact run -u",
     "preflight": "npm run update && npm run fmt && npm run lint && npm run build && npm run test"
   },
