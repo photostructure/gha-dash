@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [Unreleased (patch)]
+
+### Maintenance
+
+- GitHub releases now wait for the npm package to be approved, and carry these release notes.
 
 ## [1.0.1] - 2026-08-08
 
