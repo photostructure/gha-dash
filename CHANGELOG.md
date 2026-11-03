@@ -1,6 +1,8 @@
 # Changelog
 
-## 1.0.1 (2026-08-08)
+## [Unreleased]
+
+## [1.0.1] - 2026-08-08
 
 ### Features
 
@@ -15,14 +17,14 @@
 
 - Updated dependencies and pinned CI actions; added a standard `make preflight` release check.
 
-## 0.8.2 (2026-04-27)
+## [0.8.2] - 2026-04-27
 
 ### Fixes
 
 - **Refresh reliability** — Workflow run refreshes now avoid stale GitHub Actions ETags, while rate-limit budgeting accounts for the extra uncached API work.
 - **Quieter polling** — Removed temporary Octokit request logging so normal dashboard refreshes no longer print every GitHub API call.
 
-## 0.8.0 (2026-04-15)
+## [0.8.0] - 2026-04-15
 
 ### Features
 
@@ -35,7 +37,7 @@
 - **Stale dashboard when runs transition** — GitHub's runs endpoint was observed returning 304 while a run's status actually changed (e.g. queued → in_progress), leaving the dashboard frozen on old state. Full refresh now bypasses ETag caching for the runs endpoint, and refresh budgeting accounts for the additional counted request alongside PR counts
 - **Crash on first run before bundle extracts** — hitting the server while `npx gha-dash` was still extracting the Vue bundle produced an unhandled `NotFoundError`. Missing SPA files now return a quiet 503 so the error is recoverable
 
-## 0.7.0 (2026-04-12)
+## [0.7.0] - 2026-04-12
 
 ### Features
 
@@ -48,7 +50,7 @@
 - **Stale PR counts from cached Link headers** — `pulls.list` ETag only hashes the visible response body, not the full list state, so closing PRs not on the first page wouldn't invalidate the cache. PR count requests now bypass ETag caching entirely
 - **`/rate_limit` false alarm** — GitHub sends `Cache-Control: no-cache` and no ETag on `/rate_limit`, which inflated the "without etag" counter. Rate limit requests now skip the cache since the endpoint is exempt from quota anyway
 
-## 0.6.0 (2026-04-07)
+## [0.6.0] - 2026-04-07
 
 ### Features
 
@@ -57,7 +59,7 @@
 - **All active runs shown** — each workflow now shows all in-progress runs, not just the latest one
 - **Status dots always visible** — color-coded workflow status dots now show in repo headers whether collapsed or expanded
 
-## 0.5.0 (2026-04-07)
+## [0.5.0] - 2026-04-07
 
 ### Features
 
@@ -65,7 +67,7 @@
 - **Dispatch permission gating** — clicking dispatch on a repo where your `gh` token lacks write access shows a clear error with instructions to fix (`gh auth refresh -s workflow`)
 - **Repo header layout** — flex-aligned header contents for consistent vertical alignment
 
-## 0.4.0 (2026-04-03)
+## [0.4.0] - 2026-04-03
 
 ### Features
 
@@ -76,13 +78,13 @@
 - Single CSS source of truth — fixes missing footer and status dot styles in production builds
 - Dev port documentation — README now explains the dual-port dev setup (Express :3131 + Vite :5173)
 
-## 0.3.0 (2026-04-03)
+## [0.3.0] - 2026-04-03
 
 ### Fixes
 
 - Add `repository` field to package.json for npm OIDC provenance
 
-## 0.2.0 (2026-04-03)
+## [0.2.0] - 2026-04-03
 
 ### Features
 
@@ -96,7 +98,7 @@
 - **Config save awaits refresh** — adding a repo in settings now shows its workflows immediately instead of after the next poll
 - Dev startup race condition — Vue app retries API fetch if Express hasn't started yet
 
-## 0.1.1 (2026-04-03)
+## [0.1.1] - 2026-04-03
 
 ### Features
 
@@ -109,3 +111,14 @@
 - Dark mode (automatic via OS preference)
 - Disk cache — restarts don't refetch
 - Initial npm release — `npx gha-dash`
+
+[1.0.1]: https://github.com/photostructure/gha-dash/releases/tag/v1.0.1
+[0.8.2]: https://github.com/photostructure/gha-dash/releases/tag/v0.8.2
+[0.8.0]: https://github.com/photostructure/gha-dash/releases/tag/v0.8.0
+[0.7.0]: https://github.com/photostructure/gha-dash/releases/tag/v0.7.0
+[0.6.0]: https://github.com/photostructure/gha-dash/releases/tag/v0.6.0
+[0.5.0]: https://github.com/photostructure/gha-dash/releases/tag/v0.5.0
+[0.4.0]: https://github.com/photostructure/gha-dash/releases/tag/v0.4.0
+[0.3.0]: https://github.com/photostructure/gha-dash/releases/tag/v0.3.0
+[0.2.0]: https://github.com/photostructure/gha-dash/releases/tag/v0.2.0
+[0.1.1]: https://github.com/photostructure/gha-dash/releases/tag/v0.1.1
