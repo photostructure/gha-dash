@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased (patch)]
+## [Unreleased]
+
+## [1.0.2] - 2026-11-04
 
 ### Maintenance
 
@@ -116,6 +118,7 @@
 - Disk cache — restarts don't refetch
 - Initial npm release — `npx gha-dash`
 
+[1.0.2]: https://github.com/photostructure/gha-dash/releases/tag/v1.0.2
 [1.0.1]: https://github.com/photostructure/gha-dash/releases/tag/v1.0.1
 [0.8.2]: https://github.com/photostructure/gha-dash/releases/tag/v0.8.2
 [0.8.0]: https://github.com/photostructure/gha-dash/releases/tag/v0.8.0
