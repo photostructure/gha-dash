@@ -111,6 +111,14 @@ npm stage approve STAGE_ID
 | The one-day artifact expired                                                | Stop. Do not rebuild the package artifact independently; review the tagged workflow and choose a recovery that preserves package identity.                                                                                                                               |
 | A published package is bad                                                  | Deprecate it or publish a corrected version. Never overwrite it.                                                                                                                                                                                                         |
 
+When a failure above calls for a new version after the tag exists, the release
+commit has already moved the notes under `## [X.Y.Z] - YYYY-MM-DD` in
+`CHANGELOG.md`, and the next release run fails until `## [Unreleased]` names a
+bump and has notes. Rename that empty heading to
+`## [Unreleased (patch|minor|major)]`, move the unpublished version's notes
+under it, leave a line under `## [X.Y.Z]` saying that version was never
+published, and then start the new release.
+
 Do not weaken branch or tag rules to repair a failed release. The pilot uses
 the repository `GITHUB_TOKEN` for signed direct pushes. A future tag-creation
 ruleset requires a narrowly scoped GitHub App or a separately approved release
