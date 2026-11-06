@@ -4,7 +4,7 @@ min_age:
   always: true # also verify already-pinned versions on every run, not just updates
 # rules needs pinact v4; v3 ignores the key.
 rules:
-  # Our own actions skip the cooldown, like our own packages on npm.
+  # Our own actions skip the cooldown, so a release can pin a new version at once.
   - min_age: 0
     conditions:
       - expr: ActionRepoOwner == "photostructure"
