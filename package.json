@@ -61,7 +61,7 @@
     "eslint-config-prettier": "^10.1.8",
     "msw": "3.0.3",
     "npm-check-updates": "23.1.1",
-    "npm-run-all2": "9.0.3",
+    "npm-run-all2": "9.0.4",
     "prettier": "3.9.10",
     "prettier-plugin-organize-imports": "^4.3.0",
     "supertest": "7.3.1",
